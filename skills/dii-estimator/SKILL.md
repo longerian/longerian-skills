@@ -27,7 +27,7 @@ version: 1.0.0
     ├── food_nutrition_db.json  # 食物营养数据库
     ├── dii_input.json          # 输入（临时）
     ├── dii_result.json         # 输出（临时）
-    └── report.md               # 详细报告
+    └── YYYY-MM-DD_HH-MM_食物1_食物2_report.md  # 详细报告（带时间戳和食物名）
 ```
 
 ## 流程
@@ -116,7 +116,9 @@ python3 ~/.longerian/scripts/dii_calculator.py
 | 0 ≤ DII < 1 | 🟠 轻度促炎 |
 | DII ≥ 1 | 🔴 强促炎 |
 
-**Markdown 报告**（保存到 `~/.longerian/data/dii/report.md`）：
+**Markdown 报告**（保存到 `~/.longerian/data/dii/YYYY-MM-DD_HH-MM_食物1_食物2_report.md`）：
+
+文件名格式：`{日期}_{时间}_{主要食物名}_report.md`，例如 `2026-04-30_18-30_番茄炒蛋_米饭_report.md`。食物名取前 2-3 种主要食物，过长时省略。
 1. 食物识别结果（每种食物含置信度）
 2. 营养成分明细表（45 项参数）
 3. DII 总分及各成分得分
