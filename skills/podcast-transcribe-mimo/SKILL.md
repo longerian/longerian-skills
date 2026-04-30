@@ -14,6 +14,21 @@ Transcribe podcast audio via MiniMax MiMo v2.5 cloud API. Faster and higher qual
 - Environment variable `MIMO_API_KEY` set with valid API key
 - Audio URL must be cloud-accessible (RSS-authorized URL, NOT CDN direct link)
 
+## Execution Convention
+
+All Python scripts in this skill should be:
+1. Written to `/tmp/longerian_skill/` as `.py` files
+2. Executed via shell: `python3 /tmp/longerian_skill/xxx.py`
+
+Example:
+```bash
+mkdir -p /tmp/longerian_skill
+cat > /tmp/longerian_skill/transcribe_mimo.py << 'PYEOF'
+# python code here
+PYEOF
+python3 /tmp/longerian_skill/transcribe_mimo.py
+```
+
 ## Key Difference from Whisper
 
 | Dimension | Whisper (local) | MiMo (cloud) |

@@ -14,6 +14,22 @@ Transcribe podcast audio locally using OpenAI Whisper large-v3-turbo model. Comp
 - `modelscope` package for model download (faster in China)
 - Sufficient disk space (~1.5GB for model)
 
+## Execution Convention
+
+All Python scripts in this skill should be:
+1. Written to `/tmp/longerian_skill/` as `.py` files
+2. Executed via shell: `python3 /tmp/longerian_skill/xxx.py`
+3. If default python3 fails (version conflict), try `python3.11` explicitly
+
+Example:
+```bash
+mkdir -p /tmp/longerian_skill
+cat > /tmp/longerian_skill/transcribe.py << 'PYEOF'
+# python code here
+PYEOF
+python3 /tmp/longerian_skill/transcribe.py
+```
+
 ## Model Storage
 
 Model stored at: `~/.longerian/models/whisper/` (persistent, survives reboot, agent-agnostic)
@@ -56,22 +72,30 @@ Auto-check and download if needed (see Model Storage section above). Model path:
 
 ### Step 3: Run Whisper Transcription
 
+Write script to `/tmp/longerian_skill/transcribe.py`:
+
 ```python
 import os, whisper
 
 MODEL_PATH = os.path.expanduser('~/.longerian/models/whisper/iic/Whisper-large-v3-turbo/large-v3-turbo.pt')
-model = whisper.load_model(MODEL_PATH)
-result = model.transcribe('/tmp/podcast_episode.m4a', language='zh', verbose=True)
+AUDIO_PATH = '/tmp/podcast_episode.m4a'
+OUTPUT_DIR = '/tmp/podcast_transcript'
 
-# Save transcript
-with open('/tmp/podcast_transcript/transcript.txt', 'w', encoding='utf-8') as f:
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+model = whisper.load_model(MODEL_PATH)
+result = model.transcribe(AUDIO_PATH, language='zh', verbose=True)
+
+with open(os.path.join(OUTPUT_DIR, 'transcript.txt'), 'w', encoding='utf-8') as f:
     for seg in result['segments']:
         f.write(seg['text'] + '\n')
+
+print(f"Transcription saved to {OUTPUT_DIR}/transcript.txt")
 ```
 
-Use python3.11 explicitly if default python3 has version conflicts:
+Execute:
 ```bash
-/Library/Frameworks/Python.framework/Versions/3.11/bin/python3 script.py
+python3 /tmp/longerian_skill/transcribe.py
 ```
 
 ### Step 4: Organize Knowledge Points
