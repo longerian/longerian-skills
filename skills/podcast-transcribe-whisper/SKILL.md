@@ -14,38 +14,20 @@ Transcribe podcast audio locally using OpenAI Whisper large-v3-turbo model. Comp
 - `modelscope` package for model download (faster in China)
 - Sufficient disk space (~1.5GB for model)
 
-## Execution Convention
+## Directory Convention
 
-All Python scripts in this skill should be:
-1. Written to `/tmp/longerian_skill/` as `.py` files
-2. Executed via shell: `python3 /tmp/longerian_skill/xxx.py`
-3. If default python3 fails (version conflict), try `python3.11` explicitly
+All files use `~/.longerian/` (persistent, agent-agnostic):
 
-Example:
-```bash
-mkdir -p /tmp/longerian_skill
-cat > /tmp/longerian_skill/transcribe.py << 'PYEOF'
-# python code here
-PYEOF
-python3 /tmp/longerian_skill/transcribe.py
+```
+~/.longerian/
+├── models/whisper/          # Whisper model (auto-download)
+├── scripts/                 # Python scripts
+└── data/podcast/            # Audio files + transcript output
 ```
 
-## Model Storage
-
-Model stored at: `~/.longerian/models/whisper/` (persistent, survives reboot, agent-agnostic)
-
-Auto-detect before transcription:
-```python
-import os
-MODEL_DIR = os.path.expanduser('~/.longerian/models/whisper/iic/Whisper-large-v3-turbo')
-MODEL_PATH = os.path.join(MODEL_DIR, 'large-v3-turbo.pt')
-
-if not os.path.exists(MODEL_PATH):
-    print("Downloading Whisper model from ModelScope...")
-    os.makedirs(os.path.expanduser('~/.longerian/models/whisper'), exist_ok=True)
-    from modelscope import snapshot_download
-    snapshot_download('iic/Whisper-large-v3-turbo', cache_dir=os.path.expanduser('~/.longerian/models/whisper'))
-    print("Model downloaded.")
+Setup:
+```bash
+mkdir -p ~/.longerian/{scripts,data/podcast,models/whisper}
 ```
 
 ## Pipeline
@@ -62,45 +44,70 @@ For Xiaoyuzhou (小宇宙) podcasts:
 For direct CDN URLs (xmcdn.com), use them for local download only (not for API access).
 
 ```bash
-# Download audio via CDN direct URL (works for local use)
-curl -sL -o /tmp/podcast_episode.m4a "<CDN_DIRECT_URL>"
+curl -sL -o ~/.longerian/data/podcast/episode.m4a "<CDN_DIRECT_URL>"
 ```
 
 ### Step 2: Ensure Whisper Model Ready
 
-Auto-check and download if needed (see Model Storage section above). Model path: `~/.longerian/models/whisper/iic/Whisper-large-v3-turbo/large-v3-turbo.pt`
+Model path: `~/.longerian/models/whisper/iic/Whisper-large-v3-turbo/large-v3-turbo.pt`
+
+Write script to `~/.longerian/scripts/ensure_model.py`:
+
+```python
+import os
+
+MODEL_DIR = os.path.expanduser('~/.longerian/models/whisper/iic/Whisper-large-v3-turbo')
+MODEL_PATH = os.path.join(MODEL_DIR, 'large-v3-turbo.pt')
+
+if not os.path.exists(MODEL_PATH):
+    print("Downloading Whisper model from ModelScope...")
+    os.makedirs(os.path.expanduser('~/.longerian/models/whisper'), exist_ok=True)
+    from modelscope import snapshot_download
+    snapshot_download('iic/Whisper-large-v3-turbo', cache_dir=os.path.expanduser('~/.longerian/models/whisper'))
+    print("Model downloaded.")
+else:
+    print("Model ready.")
+```
+
+Execute:
+```bash
+python3 ~/.longerian/scripts/ensure_model.py
+```
 
 ### Step 3: Run Whisper Transcription
 
-Write script to `/tmp/longerian_skill/transcribe.py`:
+Write script to `~/.longerian/scripts/transcribe.py`:
 
 ```python
 import os, whisper
 
 MODEL_PATH = os.path.expanduser('~/.longerian/models/whisper/iic/Whisper-large-v3-turbo/large-v3-turbo.pt')
-AUDIO_PATH = '/tmp/podcast_episode.m4a'
-OUTPUT_DIR = '/tmp/podcast_transcript'
+AUDIO_PATH = os.path.expanduser('~/.longerian/data/podcast/episode.m4a')
+OUTPUT_DIR = os.path.expanduser('~/.longerian/data/podcast')
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 model = whisper.load_model(MODEL_PATH)
 result = model.transcribe(AUDIO_PATH, language='zh', verbose=True)
 
-with open(os.path.join(OUTPUT_DIR, 'transcript.txt'), 'w', encoding='utf-8') as f:
+output_path = os.path.join(OUTPUT_DIR, 'whisper_transcript.txt')
+with open(output_path, 'w', encoding='utf-8') as f:
     for seg in result['segments']:
         f.write(seg['text'] + '\n')
 
-print(f"Transcription saved to {OUTPUT_DIR}/transcript.txt")
+print(f"Transcription saved to {output_path}")
 ```
 
 Execute:
 ```bash
-python3 /tmp/longerian_skill/transcribe.py
+python3 ~/.longerian/scripts/transcribe.py
 ```
+
+If default python3 fails (version conflict), try `python3.11` explicitly.
 
 ### Step 4: Organize Knowledge Points
 
-Read the transcript and organize into structured knowledge points:
+Read the transcript from `~/.longerian/data/podcast/whisper_transcript.txt` and organize into structured knowledge points:
 
 - Core thesis / main arguments
 - Key knowledge points by category
@@ -110,7 +117,7 @@ Read the transcript and organize into structured knowledge points:
 
 ### Step 5: Export Markdown
 
-Save to current working directory with naming convention:
+Save to current working directory:
 ```
 {podcast-title}-知识点整理.md
 {podcast-title}-Whisper转录.md

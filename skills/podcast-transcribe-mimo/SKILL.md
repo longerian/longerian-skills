@@ -14,19 +14,19 @@ Transcribe podcast audio via MiniMax MiMo v2.5 cloud API. Faster and higher qual
 - Environment variable `MIMO_API_KEY` set with valid API key
 - Audio URL must be cloud-accessible (RSS-authorized URL, NOT CDN direct link)
 
-## Execution Convention
+## Directory Convention
 
-All Python scripts in this skill should be:
-1. Written to `/tmp/longerian_skill/` as `.py` files
-2. Executed via shell: `python3 /tmp/longerian_skill/xxx.py`
+All files use `~/.longerian/` (persistent, agent-agnostic):
 
-Example:
+```
+~/.longerian/
+├── scripts/                 # Python scripts
+└── data/podcast/            # Transcript output
+```
+
+Setup:
 ```bash
-mkdir -p /tmp/longerian_skill
-cat > /tmp/longerian_skill/transcribe_mimo.py << 'PYEOF'
-# python code here
-PYEOF
-python3 /tmp/longerian_skill/transcribe_mimo.py
+mkdir -p ~/.longerian/{scripts,data/podcast}
 ```
 
 ## Key Difference from Whisper
@@ -70,9 +70,14 @@ For Xiaoyuzhou (小宇宙) podcasts:
 
 ### Step 2: Run MiMo API Transcription
 
+Write script to `~/.longerian/scripts/transcribe_mimo.py`:
+
 ```python
 from openai import OpenAI
 import os
+
+OUTPUT_DIR = os.path.expanduser('~/.longerian/data/podcast')
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 client = OpenAI(
     api_key=os.environ['MIMO_API_KEY'],
@@ -94,22 +99,29 @@ completion = client.chat.completions.create(
 )
 
 transcript = completion.choices[0].message.content
-```
 
-### Step 3: Check Completion
-
-Verify `finish_reason` is `stop` (not `length`):
-
-```python
+# Check completion
 if completion.choices[0].finish_reason == 'length':
     print("WARNING: Transcription hit token limit, may be incomplete")
+
+# Save transcript
+output_path = os.path.join(OUTPUT_DIR, 'mimo_transcript.txt')
+with open(output_path, 'w', encoding='utf-8') as f:
+    f.write(transcript)
+
+print(f"Transcription saved to {output_path}")
+print(f"Characters: {len(transcript)}")
+print(f"Tokens - prompt: {completion.usage.prompt_tokens}, completion: {completion.usage.completion_tokens}")
 ```
 
-If hit token limit, increase `max_completion_tokens` or split audio.
+Execute:
+```bash
+python3 ~/.longerian/scripts/transcribe_mimo.py
+```
 
-### Step 4: Organize Knowledge Points
+### Step 3: Organize Knowledge Points
 
-Read the transcript and organize into structured knowledge points:
+Read the transcript from `~/.longerian/data/podcast/mimo_transcript.txt` and organize into structured knowledge points:
 
 - Core thesis / main arguments
 - Key knowledge points by category
@@ -117,9 +129,9 @@ Read the transcript and organize into structured knowledge points:
 - Comparison tables (old vs new paradigms)
 - Timeline of discussion topics
 
-### Step 5: Export Markdown
+### Step 4: Export Markdown
 
-Save to current working directory with naming convention:
+Save to current working directory:
 ```
 {podcast-title}-知识点整理.md
 {podcast-title}-MiMo转录.md
