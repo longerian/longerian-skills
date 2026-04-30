@@ -43,14 +43,16 @@ Claude 视觉识别 → 食物名称 + 估算重量
     ↓
 从 food_nutrition_db.json 查询营养数据
     ↓
-写入 /tmp/longerian_skill/dii_input.json
+写入 ~/.longerian/data/dii/dii_input.json
     ↓
 运行 python3 ~/.longerian/scripts/dii_calculator.py
     ↓
-读取 dii_result.json
+读取 ~/.longerian/data/dii/dii_result.json
     ↓
 终端/对话输出摘要 + 生成 report.md
 ```
+
+**路径约定**：所有输入/输出文件统一使用 `~/.longerian/data/dii/`，与 podcast skills 的 `~/.longerian/data/podcast/` 模式一致。`dii_calculator.py` 是预安装脚本（安装时复制到 `~/.longerian/scripts/`），不是每次运行时动态生成的。
 
 ## DII 算法
 
@@ -106,6 +108,20 @@ Claude 视觉识别 → 食物名称 + 估算重量
 
 **来源**：Shivappa et al. 2014，通过 `jamesjiadazhan/dietaryindex` R 包源码交叉验证（`DII.R` 和 `DII_NHANES_FPED.R` 两份独立实现数值一致）。
 
+### dii_params.json 结构
+
+```json
+{
+  "ALCOHOL": {"inflammatory_score": -0.278, "global_mean": 13.98, "sd": 3.72},
+  "VITB12": {"inflammatory_score": 0.106, "global_mean": 5.15, "sd": 2.7},
+  "VITB6": {"inflammatory_score": -0.365, "global_mean": 1.47, "sd": 0.74},
+  "BCAROTENE": {"inflammatory_score": -0.584, "global_mean": 3718, "sd": 1720},
+  "CAFFEINE": {"inflammatory_score": -0.11, "global_mean": 8.05, "sd": 6.67}
+}
+```
+
+每个参数包含三个字段：`inflammatory_score`（炎症效应分）、`global_mean`（全球均值）、`sd`（标准差）。完整 45 项参数见上表。
+
 ### 计算公式
 
 ```python
@@ -126,7 +142,7 @@ def calculate_dii(nutrients, dii_params):
             components[param_name] = {
                 'value': value,
                 'score': round(score, 4),
-                'direction': 'anti' if score < 0 else 'pro'
+                'direction': 'anti' if score < 0 else ('neutral' if score == 0 else 'pro')
             }
             total += score
     return round(total, 4), components
@@ -218,7 +234,48 @@ def calculate_dii(nutrients, dii_params):
 
 **数据来源**：中国食物成分表（标准版）、USDA FoodData Central
 
+**缺失值约定**：每种食物的 `per_100g` 必须包含全部 45 个参数键。不适用的营养素（如绿茶不含酒精）使用 `0` 而非 `null`，确保计算时可直接使用。
+
 **扩展机制**：用户可直接编辑 `food_nutrition_db.json` 添加新食物
+
+## SKILL.md 结构
+
+沿用现有 skills 的 YAML frontmatter 格式：
+
+```markdown
+---
+name: dii-estimator
+description: Use when user wants to estimate the Dietary Inflammatory Index (DII) from a food photo. Triggers on "分析食物炎症指数", "DII 分析", "食物抗炎评分", or when a food photo is shared with inflammation analysis intent.
+version: 1.0.0
+---
+
+# 食物炎症指数（DII）估算
+
+通过食物照片识别食物成分和重量，计算膳食炎症指数（DII）。
+
+## 前置条件
+
+- Python 3.11+
+- `~/.longerian/scripts/dii_calculator.py`（安装时自动复制）
+- `~/.longerian/data/dii/food_nutrition_db.json`（安装时自动复制）
+
+## 流程
+
+### Step 1: 接收食物照片
+...
+
+### Step 2: 视觉识别食物
+...
+
+### Step 3: 查询营养数据
+...
+
+### Step 4: 运行 DII 计算
+...
+
+### Step 5: 输出结果
+...
+```
 
 ## 交互流程
 
@@ -258,9 +315,18 @@ def calculate_dii(nutrients, dii_params):
 详细报告已保存
 ```
 
+### 置信度定义
+
+食物识别置信度分为三级：
+- **高**：食物清晰可辨，常见菜品，重量可合理估算
+- **中**：食物大致可辨，但具体做法或配料不确定
+- **低**：照片模糊、食物遮挡严重、或为不常见菜品
+
+在手机端摘要中不显示置信度（保持简洁），在 Markdown 报告中对每种食物标注置信度。
+
 ### Markdown 报告内容
 
-1. 食物识别结果（含置信度）
+1. 食物识别结果（每种食物含置信度：高/中/低）
 2. 营养成分明细表（45 项参数）
 3. DII 总分及各成分得分
 4. 炎症解读（抗炎/中性/促炎 + 建议）
@@ -272,9 +338,13 @@ def calculate_dii(nutrients, dii_params):
 
 纯 Python 标准库：`json`、`math`、`sys`、`os`
 
+### 输入验证
+
+脚本不负责输入值的业务验证（如负数营养素）。验证职责在调用方（Claude 在组装 `dii_input.json` 时确保值合理）。脚本仅做格式验证（JSON 可解析、nutrients 为对象）。
+
 ### 输入
 
-`/tmp/longerian_skill/dii_input.json`
+`~/.longerian/data/dii/dii_input.json`
 
 ```json
 {
@@ -293,7 +363,7 @@ def calculate_dii(nutrients, dii_params):
 
 ### 输出
 
-`/tmp/longerian_skill/dii_result.json`
+`~/.longerian/data/dii/dii_result.json`
 
 ```json
 {
@@ -322,7 +392,7 @@ def calculate_dii(nutrients, dii_params):
 | 食物不在数据库中 | Claude 根据食物类型估算营养素，标注"估算" |
 | 无法判断重量 | 给出参考范围（如"一碗米饭约 150-200g"） |
 | 某些营养素数据缺失 | 跳过该参数，在结果中标注"已使用 X/45 个参数" |
-| 参数使用少于 10 个 | 警告"DII 精度较低" |
+| 参数使用少于 10 个 | 警告"DII 精度较低"（DII 文献建议至少使用 10 个参数以获得合理精度） |
 | Python 未安装 | 提示安装 Python 3.11+ |
 | 脚本执行失败 | 输出原始错误信息 |
 
