@@ -28,11 +28,14 @@ skills/dii-estimator/
 ~/.longerian/
 ├── scripts/dii_calculator.py   # 计算脚本（安装时复制）
 ├── data/dii/
-│   ├── dii_input.json          # 输入（临时）
-│   ├── dii_result.json         # 输出（临时）
-│   └── report.md               # 详细报告
-└── data/dii/food_nutrition_db.json  # 食物数据库
+│   ├── dii_params.json         # DII 45参数常量（安装时复制）
+│   ├── food_nutrition_db.json  # 食物营养数据库（安装时复制）
+│   ├── dii_input.json          # 输入（临时，每次分析时生成）
+│   ├── dii_result.json         # 输出（临时，每次分析时生成）
+│   └── report.md               # 详细报告（每次分析时生成）
 ```
+
+`dii_calculator.py` 从 `~/.longerian/data/dii/dii_params.json` 读取 DII 常量，从 `~/.longerian/data/dii/food_nutrition_db.json` 读取食物营养数据。
 
 ### 数据流
 
