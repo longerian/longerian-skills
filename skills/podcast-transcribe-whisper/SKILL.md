@@ -14,6 +14,24 @@ Transcribe podcast audio locally using OpenAI Whisper large-v3-turbo model. Comp
 - `modelscope` package for model download (faster in China)
 - Sufficient disk space (~1.5GB for model)
 
+## Model Storage
+
+Model stored at: `~/.longerian/models/whisper/` (persistent, survives reboot, agent-agnostic)
+
+Auto-detect before transcription:
+```python
+import os
+MODEL_DIR = os.path.expanduser('~/.longerian/models/whisper/iic/Whisper-large-v3-turbo')
+MODEL_PATH = os.path.join(MODEL_DIR, 'large-v3-turbo.pt')
+
+if not os.path.exists(MODEL_PATH):
+    print("Downloading Whisper model from ModelScope...")
+    os.makedirs(os.path.expanduser('~/.longerian/models/whisper'), exist_ok=True)
+    from modelscope import snapshot_download
+    snapshot_download('iic/Whisper-large-v3-turbo', cache_dir=os.path.expanduser('~/.longerian/models/whisper'))
+    print("Model downloaded.")
+```
+
 ## Pipeline
 
 ### Step 1: Extract Audio URL from Podcast Page
@@ -32,23 +50,17 @@ For direct CDN URLs (xmcdn.com), use them for local download only (not for API a
 curl -sL -o /tmp/podcast_episode.m4a "<CDN_DIRECT_URL>"
 ```
 
-### Step 2: Download Whisper Model
+### Step 2: Ensure Whisper Model Ready
 
-If model not cached locally, download from ModelScope (domestic mirror, faster in China):
-
-```python
-from modelscope import snapshot_download
-snapshot_download('iic/Whisper-large-v3-turbo', cache_dir='/tmp/whisper_models')
-```
-
-Model path: `/tmp/whisper_models/iic/Whisper-large-v3-turbo/large-v3-turbo.pt`
+Auto-check and download if needed (see Model Storage section above). Model path: `~/.longerian/models/whisper/iic/Whisper-large-v3-turbo/large-v3-turbo.pt`
 
 ### Step 3: Run Whisper Transcription
 
 ```python
-import whisper
+import os, whisper
 
-model = whisper.load_model('/tmp/whisper_models/iic/Whisper-large-v3-turbo/large-v3-turbo.pt')
+MODEL_PATH = os.path.expanduser('~/.longerian/models/whisper/iic/Whisper-large-v3-turbo/large-v3-turbo.pt')
+model = whisper.load_model(MODEL_PATH)
 result = model.transcribe('/tmp/podcast_episode.m4a', language='zh', verbose=True)
 
 # Save transcript
