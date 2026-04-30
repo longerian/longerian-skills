@@ -253,37 +253,37 @@ def test_calculate_dii_skips_missing_params():
 
 ```python
 def test_interpret_dii_strong_anti():
-    """DII < -1 should be strong anti-inflammatory."""
+    """DII < -1 should be anti-inflammatory."""
     level, label = interpret_dii(-2.0)
-    assert level == "strong_anti"
-    assert "强抗炎" in label
+    assert level == "anti_inflammatory"
+    assert "抗炎饮食" in label
 
 
 def test_interpret_dii_mild_anti():
     """-1 <= DII < 0 should be mild anti-inflammatory."""
     level, label = interpret_dii(-0.5)
-    assert level == "mild_anti"
-    assert "轻度抗炎" in label
+    assert level == "mild_anti_inflammatory"
+    assert "轻度抗炎饮食" in label
 
 
 def test_interpret_dii_mild_pro():
     """0 <= DII < 1 should be mild pro-inflammatory."""
     level, label = interpret_dii(0.5)
-    assert level == "mild_pro"
-    assert "轻度促炎" in label
+    assert level == "mild_pro_inflammatory"
+    assert "轻度促炎饮食" in label
 
 
 def test_interpret_dii_strong_pro():
-    """DII >= 1 should be strong pro-inflammatory."""
+    """DII >= 1 should be pro-inflammatory."""
     level, label = interpret_dii(2.0)
-    assert level == "strong_pro"
-    assert "强促炎" in label
+    assert level == "pro_inflammatory"
+    assert "促炎饮食" in label
 
 
 def test_interpret_dii_zero():
     """DII = 0 should be mild pro-inflammatory (boundary)."""
     level, label = interpret_dii(0.0)
-    assert level == "mild_pro"
+    assert level == "mild_pro_inflammatory"
 ```
 
 - [ ] **Step 5: Write test for direction classification**
@@ -299,7 +299,67 @@ def test_direction_neutral():
     assert components["ALCOHOL"]["direction"] == "neutral"
 ```
 
-- [ ] **Step 6: Run tests to verify they fail**
+- [ ] **Step 6: Write additional test cases from spec**
+
+```python
+def test_calculate_dii_all_45_params():
+    """Test with all 45 parameters provided (full coverage)."""
+    import json
+    params_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'dii_params.json')
+    with open(params_path, 'r') as f:
+        params = json.load(f)
+    # Use global mean values → DII should be ~0
+    nutrients = {name: p['global_mean'] for name, p in params.items()}
+    score, components = calculate_dii(nutrients, params)
+    assert len(components) == 45
+    assert abs(score) < 0.01  # Should be very close to 0
+
+
+def test_calculate_dii_10_params():
+    """Test with only 10 parameters (partial coverage)."""
+    params = {
+        "ALCOHOL": {"inflammatory_score": -0.278, "global_mean": 13.98, "sd": 3.72},
+        "VITB12": {"inflammatory_score": 0.106, "global_mean": 5.15, "sd": 2.7},
+        "VITB6": {"inflammatory_score": -0.365, "global_mean": 1.47, "sd": 0.74},
+        "BCAROTENE": {"inflammatory_score": -0.584, "global_mean": 3718, "sd": 1720},
+        "CAFFEINE": {"inflammatory_score": -0.11, "global_mean": 8.05, "sd": 6.67},
+        "CARB": {"inflammatory_score": 0.097, "global_mean": 272.2, "sd": 40},
+        "CHOLES": {"inflammatory_score": 0.11, "global_mean": 279.4, "sd": 51.2},
+        "KCAL": {"inflammatory_score": 0.18, "global_mean": 2056, "sd": 338},
+        "FIBER": {"inflammatory_score": -0.663, "global_mean": 18.8, "sd": 4.9},
+        "SATFAT": {"inflammatory_score": 0.373, "global_mean": 28.6, "sd": 8},
+    }
+    nutrients = {name: p['global_mean'] for name, p in params.items()}
+    score, components = calculate_dii(nutrients, params)
+    assert len(components) == 10
+    assert abs(score) < 0.01
+
+
+def test_calculate_dii_extreme_high():
+    """Test with extreme high values (should not crash)."""
+    params = {
+        "KCAL": {"inflammatory_score": 0.18, "global_mean": 2056, "sd": 338},
+        "SATFAT": {"inflammatory_score": 0.373, "global_mean": 28.6, "sd": 8},
+    }
+    nutrients = {"KCAL": 10000, "SATFAT": 200}
+    score, components = calculate_dii(nutrients, params)
+    assert isinstance(score, float)
+    assert score > 0  # Extreme high pro-inflammatory values should give positive DII
+
+
+def test_calculate_dii_extreme_low():
+    """Test with extreme low values (should not crash)."""
+    params = {
+        "FIBER": {"inflammatory_score": -0.663, "global_mean": 18.8, "sd": 4.9},
+        "VITC": {"inflammatory_score": -0.424, "global_mean": 118.2, "sd": 43.46},
+    }
+    nutrients = {"FIBER": 0, "VITC": 0}
+    score, components = calculate_dii(nutrients, params)
+    assert isinstance(score, float)
+    assert score > 0  # Low anti-inflammatory values should give positive DII
+```
+
+- [ ] **Step 7: Run tests to verify they fail**
 
 ```bash
 cd skills/dii-estimator && python3 -m pytest tests/test_dii_calculator.py -v
@@ -307,7 +367,7 @@ cd skills/dii-estimator && python3 -m pytest tests/test_dii_calculator.py -v
 
 Expected: All FAIL with `ModuleNotFoundError`
 
-- [ ] **Step 7: Commit test file**
+- [ ] **Step 8: Commit test file**
 
 ```bash
 git add skills/dii-estimator/tests/test_dii_calculator.py
@@ -383,13 +443,13 @@ def interpret_dii(dii_score):
         (level, label) tuple
     """
     if dii_score < -1:
-        return "strong_anti", "强抗炎"
+        return "anti_inflammatory", "抗炎饮食"
     elif dii_score < 0:
-        return "mild_anti", "轻度抗炎"
+        return "mild_anti_inflammatory", "轻度抗炎饮食"
     elif dii_score < 1:
-        return "mild_pro", "轻度促炎"
+        return "mild_pro_inflammatory", "轻度促炎饮食"
     else:
-        return "strong_pro", "强促炎"
+        return "pro_inflammatory", "促炎饮食"
 
 
 def main():
@@ -410,9 +470,18 @@ def main():
     nutrients = data.get('nutrients', {})
     foods = data.get('foods', [])
 
+    # Validate nutrients is a dict
+    if not isinstance(nutrients, dict):
+        print("Error: 'nutrients' must be a JSON object", file=sys.stderr)
+        sys.exit(1)
+
     # Calculate DII
     score, components = calculate_dii(nutrients, dii_params)
     level, label = interpret_dii(score)
+
+    # Warn if too few parameters
+    if len(components) < 10:
+        print(f"Warning: Only {len(components)} parameters used. DII accuracy may be low (recommended: >= 10).", file=sys.stderr)
 
     # Build result
     result = {
@@ -465,7 +534,7 @@ The database maps food names to per_100g nutrient values for all 45 DII paramete
 
 Data sources: 中国食物成分表（标准版）, USDA FoodData Central.
 
-Start with a representative subset (~30 foods) to validate the structure, then expand to full ~215.
+Start with a representative subset (~100 foods) to validate the structure, then expand to full ~215.
 
 Initial foods to include (covering all 12 categories):
 
