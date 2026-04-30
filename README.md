@@ -1,32 +1,29 @@
 # longerian-skills
 
-Claude Code skills collection by longerian.
+Agent skills collection by longerian. Compatible with Claude Code, OpenClaw, Qoder, and other agents.
 
-## Podcast Transcription Skills
+## Skills
 
-Two engines available for podcast audio transcription:
-
-- **Whisper** - local transcription using OpenAI Whisper large-v3-turbo
-- **MiMo** - cloud transcription using MiniMax MiMo v2.5 API
-
-Both provide complete pipeline: download audio → transcribe → organize knowledge → export Markdown.
+| Skill | Description |
+|-------|-------------|
+| [podcast-transcribe-whisper](skills/podcast-transcribe-whisper/SKILL.md) | Local podcast transcription using Whisper large-v3-turbo |
+| [podcast-transcribe-mimo](skills/podcast-transcribe-mimo/SKILL.md) | Cloud podcast transcription using MiniMax MiMo v2.5 API |
 
 ## Installation
 
+Install all skills:
+
 ```bash
-npx longerian-skills
+npx skills add longerian/longerian-skills
 ```
 
-This installs both skills to `~/.claude/skills/`.
+Install specific skill:
 
-## Usage
-
-In Claude Code:
-
+```bash
+npx skills add longerian/longerian-skills --skill podcast-transcribe-mimo
 ```
-/podcast-transcribe-whisper https://www.xiaoyuzhoufm.com/episode/xxx
-/podcast-transcribe-mimo https://www.xiaoyuzhoufm.com/episode/xxx
-```
+
+The installer will auto-detect your installed agents and let you choose where to install.
 
 ## Environment Variables
 
@@ -34,7 +31,7 @@ In Claude Code:
 |----------|----------|-------------|
 | `MIMO_API_KEY` | For MiMo skill | MiniMax MiMo API key |
 
-## Comparison
+## Whisper vs MiMo
 
 | Dimension | Whisper (local) | MiMo (cloud) |
 |-----------|----------------|--------------|
