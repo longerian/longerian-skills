@@ -9,6 +9,7 @@ Agent skills collection by longerian. Compatible with Claude Code, OpenClaw, Qod
 | [podcast-transcribe-whisper](skills/podcast-transcribe-whisper/SKILL.md) | Local podcast transcription using Whisper large-v3-turbo |
 | [podcast-transcribe-mimo](skills/podcast-transcribe-mimo/SKILL.md) | Cloud podcast transcription using MiniMax MiMo v2.5 API |
 | [dii-estimator](skills/dii-estimator/SKILL.md) | Estimate Dietary Inflammatory Index (DII) from food photos |
+| [option-yield](skills/option-yield/SKILL.md) | Calculate annualized premium yield for sold options (puts/calls) |
 
 ## Installation
 
