@@ -80,6 +80,7 @@ total_annualized = premium_annualized + risk_free_rate
 | `market` | 市场 | us / hk |
 | `option_type` | 期权类型 | put / call |
 | `quantity` | 合约数量（张） | 999 |
+| `shares_per_contract` | 每张合约股数 | 100 |
 | `underlying` | 标的代码 | AAPL |
 
 ### 计算示例（段永平AAPL交易）
@@ -101,10 +102,10 @@ total_annualized = premium_annualized + risk_free_rate
 
 ### 市场支持
 
-| 市场 | 代码 | 无风险利率来源 | 说明 |
-|------|------|--------------|------|
-| 美股 | `us` | 美国国债收益率（10年期） | 默认市场 |
-| 港股 | `hk` | 香港银行间同业拆借利率（HIBOR） | 港股期权 |
+| 市场 | 代码 | 无风险利率来源 | 每张合约默认股数 | 说明 |
+|------|------|--------------|----------------|------|
+| 美股 | `us` | 美国国债收益率（10年期） | 100股 | 默认市场，固定100股/张 |
+| 港股 | `hk` | 香港银行间同业拆借利率（HIBOR） | 100股（可覆盖） | 港股期权，股数不统一 |
 
 ### 无风险利率获取与验证流程
 
@@ -162,6 +163,7 @@ Agent 使用内置视觉能力从截图中识别以下信息：
 | 期权类型 | 默认 Sell Put，向用户确认 |
 | 市场 | 根据标的代码自动判断（如港股代码以数字开头），否则询问用户 |
 | 无风险利率 | 根据市场搜索对应利率，验证时效性，失败则要求用户输入 |
+| 每张合约股数 | 美股默认100股；港股默认100股，但提示用户确认（港股可能为500股等） |
 | 数量 | 默认1张 |
 
 ## 输出格式
@@ -199,6 +201,7 @@ Agent 使用内置视觉能力从截图中识别以下信息：
   "premium": 14.45,
   "months": 7,
   "quantity": 999,
+  "shares_per_contract": 100,
   "risk_free_rate": 0.043
 }
 ```
@@ -214,6 +217,7 @@ Agent 使用内置视觉能力从截图中识别以下信息：
   "premium": 14.45,
   "months": 7,
   "quantity": 999,
+  "shares_per_contract": 100,
   "risk_free_rate": 0.043,
   "risk_free_rate_source": "US 10Y Treasury",
   "risk_free_rate_date": "2026-05-01",
