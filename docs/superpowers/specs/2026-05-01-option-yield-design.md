@@ -104,14 +104,14 @@ total_annualized = premium_annualized + risk_free_rate
 
 | 市场 | 代码 | 无风险利率来源 | 每张合约默认股数 | 说明 |
 |------|------|--------------|----------------|------|
-| 美股 | `us` | 美国国债收益率（10年期） | 100股 | 默认市场，固定100股/张 |
+| 美股 | `us` | 美国国债收益率（1年期） | 100股 | 默认市场，固定100股/张 |
 | 港股 | `hk` | 香港银行间同业拆借利率（HIBOR） | 自动查询HKEX | 港股期权，股数不统一，需查询 |
 
 ### 无风险利率获取与验证流程
 
 ```
 1. 根据市场选择利率来源
-   - 美股 → 搜索 "US 10-year Treasury yield"
+   - 美股 → 搜索 "US 1-year Treasury yield"
    - 港股 → 搜索 "HK HIBOR rate"
     ↓
 2. 搜索获取最新利率数据
@@ -201,7 +201,7 @@ Agent 使用内置视觉能力从截图中识别以下信息：
 净资金占用: $180.55/股
 总权利金收入: $1,443,555.00
 权利金年化收益率: 13.7%
-无风险利率: 4.3%（US 10Y Treasury, 2026-05-01）
+无风险利率: 4.3%（US 1Y Treasury, 2026-05-01）
 总年化收益率: 18.0%
 ```
 
@@ -236,7 +236,7 @@ Agent 使用内置视觉能力从截图中识别以下信息：
   "quantity": 999,
   "shares_per_contract": 100,
   "risk_free_rate": 0.043,
-  "risk_free_rate_source": "US 10Y Treasury",
+  "risk_free_rate_source": "US 1Y Treasury",
   "risk_free_rate_date": "2026-05-01",
   "capital_per_share": 180.55,
   "total_premium_income": 1443555.00,
