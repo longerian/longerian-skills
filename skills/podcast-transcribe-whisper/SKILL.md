@@ -10,24 +10,21 @@ Transcribe podcast audio locally using OpenAI Whisper large-v3-turbo model. Comp
 
 ## Prerequisites
 
-- Python 3.11+ with `openai-whisper` installed
-- `modelscope` package for model download (faster in China)
+- Python 3.x with `openai-whisper` installed
 - Sufficient disk space (~1.5GB for model)
 
 ## Directory Convention
 
-All files use `~/.longerian/` (persistent, agent-agnostic):
-
 ```
+~/.cache/whisper/             # Whisper models (shared across skills)
 ~/.longerian/
-├── models/whisper/          # Whisper model (auto-download)
 ├── scripts/                 # Python scripts
 └── data/podcast/            # Audio files + transcript output
 ```
 
 Setup:
 ```bash
-mkdir -p ~/.longerian/{scripts,data/podcast,models/whisper}
+mkdir -p ~/.longerian/{scripts,data/podcast}
 ```
 
 ## Pipeline
@@ -49,30 +46,17 @@ curl -sL -o ~/.longerian/data/podcast/episode.m4a "<CDN_DIRECT_URL>"
 
 ### Step 2: Ensure Whisper Model Ready
 
-Model path: `~/.longerian/models/whisper/iic/Whisper-large-v3-turbo/large-v3-turbo.pt`
+Model location: `~/.cache/whisper/` (Whisper default cache, shared with bilibili skill)
 
-Write script to `~/.longerian/scripts/ensure_model.py`:
+Whisper auto-downloads models on first use. To check available models:
 
-```python
-import os
-
-MODEL_DIR = os.path.expanduser('~/.longerian/models/whisper/iic/Whisper-large-v3-turbo')
-MODEL_PATH = os.path.join(MODEL_DIR, 'large-v3-turbo.pt')
-
-if not os.path.exists(MODEL_PATH):
-    print("Downloading Whisper model from ModelScope...")
-    os.makedirs(os.path.expanduser('~/.longerian/models/whisper'), exist_ok=True)
-    from modelscope import snapshot_download
-    snapshot_download('iic/Whisper-large-v3-turbo', cache_dir=os.path.expanduser('~/.longerian/models/whisper'))
-    print("Model downloaded.")
-else:
-    print("Model ready.")
-```
-
-Execute:
 ```bash
-python3 ~/.longerian/scripts/ensure_model.py
+ls ~/.cache/whisper/
 ```
+
+Models:
+- `base.pt` (~145 MB) - Fast, good for quick tests
+- `large-v3-turbo.pt` (~1.2 GB) - Best accuracy (recommended)
 
 ### Step 3: Run Whisper Transcription
 
@@ -81,13 +65,14 @@ Write script to `~/.longerian/scripts/transcribe.py`:
 ```python
 import os, whisper
 
-MODEL_PATH = os.path.expanduser('~/.longerian/models/whisper/iic/Whisper-large-v3-turbo/large-v3-turbo.pt')
 AUDIO_PATH = os.path.expanduser('~/.longerian/data/podcast/episode.m4a')
 OUTPUT_DIR = os.path.expanduser('~/.longerian/data/podcast')
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-model = whisper.load_model(MODEL_PATH)
+# Use model size: tiny, base, small, medium, large-v3-turbo
+# Whisper auto-loads from ~/.cache/whisper/
+model = whisper.load_model('large-v3-turbo')
 result = model.transcribe(AUDIO_PATH, language='zh', verbose=True)
 
 output_path = os.path.join(OUTPUT_DIR, 'whisper_transcript.txt')
@@ -102,8 +87,6 @@ Execute:
 ```bash
 python3 ~/.longerian/scripts/transcribe.py
 ```
-
-If default python3 fails (version conflict), try `python3.11` explicitly.
 
 ### Step 4: Organize Knowledge Points
 
@@ -132,6 +115,6 @@ Save to current working directory:
 
 ## Tips
 
-- If HuggingFace download fails (SSL/network), use ModelScope mirror
-- If `openai-whisper` import fails, check Python version (needs 3.11)
+- Models are auto-downloaded to `~/.cache/whisper/` on first use
 - For better quality with punctuation, consider using MiMo API skill instead
+- CPU transcription is slow (~20 min for 1.5h audio); GPU much faster
