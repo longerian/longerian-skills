@@ -1,6 +1,6 @@
 ---
 name: bilibili-research
-description: Use when user wants to analyze a Bilibili video: extract subtitles/transcript for AI agent analysis. Triggers on Bilibili URLs (bilibili.com, b23.tv) or when analysis/intent keywords like "analyze", "研究", "提取", "outline", "summary" are provided.
+description: Use when user wants to analyze a Bilibili video or extract transcript for AI analysis. Triggers on Bilibili URLs (bilibili.com, b23.tv) or when keywords like "analyze", "研究", "提取", "transcribe" are provided.
 version: 1.0.0
 ---
 
