@@ -80,6 +80,9 @@ def main():
     parser.add_argument('--no-charts', action='store_true', help='Skip chart generation')
     parser.add_argument('--basic', action='store_true', help='Use basic analysis (no detailed content)')
     parser.add_argument('--model', default='glm-4-flash', help='LLM model to use (default: glm-4-flash)')
+    parser.add_argument('--agent-analyze', action='store_true', help='Output transcript for AI agent analysis (skip LLM API call)')
+    parser.add_argument('--skip-analysis', action='store_true', help='Skip analysis, only do transcription')
+    parser.add_argument('--claude-analyze', action='store_true', help='Use Claude Agent for analysis (instead of GLM API)')
     args = parser.parse_args()
 
     url = args.url
@@ -129,7 +132,51 @@ def main():
             return 1
         print()
 
-    # Step 3: Analyze content (enhanced or basic)
+    # Step 3: Analyze content using Agent tool (if --use-agent flag)
+    if hasattr(args, 'use_agent') and args.use_agent:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        transcript_file = OUTPUT_DIR / f'transcript_{video_id}_{timestamp}.txt'
+
+        # Save transcript with metadata for agent analysis
+        with open(transcript_file, 'w', encoding='utf-8') as f:
+            f.write(f"# {result.title}\n\n")
+            f.write(f"**视频信息**\n")
+            f.write(f"- URL: {url}\n")
+            f.write(f"- UP主: {result.uploader}\n")
+            f.write(f"- 时长: {format_duration(result.duration)}\n")
+            f.write(f"- 视频ID: {video_id}\n")
+            f.write(f"\n**转录文本**\n\n")
+            f.write(transcript)
+
+        print(f"📝 转录已保存到: {transcript_file}")
+        print(f"📏 转录文本: {len(transcript)} 字符")
+        print(f"\n💡 请使用 Agent 工具分析此转录文件")
+        print(f"   文件路径: {transcript_file}")
+        return 0
+
+    # Special mode: output for AI agent analysis (--agent-analyze flag)
+    if args.agent_analyze or args.skip_analysis:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        transcript_file = OUTPUT_DIR / f'transcript_{video_id}_{timestamp}.txt'
+
+        # Save transcript with metadata for agent analysis
+        with open(transcript_file, 'w', encoding='utf-8') as f:
+            f.write(f"# {result.title}\n\n")
+            f.write(f"**视频信息**\n")
+            f.write(f"- URL: {url}\n")
+            f.write(f"- UP主: {result.uploader}\n")
+            f.write(f"- 时长: {format_duration(result.duration)}\n")
+            f.write(f"- 视频ID: {video_id}\n")
+            f.write(f"\n**转录文本**\n\n")
+            f.write(transcript)
+
+        print(f"📝 转录已保存到: {transcript_file}")
+        print(f"📏 转录文本: {len(transcript)} 字符")
+        print(f"\n💡 下一步: 让 AI 分析此转录文件")
+        print(f"   可使用 Read 工具读取: {transcript_file}")
+
+        return 0 if args.skip_analysis else None  # Continue to analysis if not skip
+
     print("🧠 正在分析内容...")
     enhanced = not args.basic
     try:

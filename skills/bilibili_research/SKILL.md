@@ -70,7 +70,7 @@ transcript = transcription['text']
 
 ### Step 3: Analyze Content (Agent)
 
-Extract outline, core points, entities, and verifiable claims:
+**Option A: Use LLM API (faster, automated)**
 
 ```python
 from shared.analyzer import analyze_content
@@ -89,6 +89,37 @@ Returns:
 - `verifiable_claims`: statements for fact-checking
 - `keywords`: for extended reading search
 - `summary`: one-line summary
+
+**Option B: Use Agent Analysis (recommended, better quality)**
+
+Run with `--agent-analyze` flag to output transcript for AI agent analysis:
+
+```bash
+python3 skills/bilibili_research/bilibili_research.py "https://www.bilibili.com/video/BV..." --agent-analyze
+```
+
+This saves the transcript to `~/.longerian/data/bilibili-research/transcript_{VIDEO_ID}_{TIMESTAMP}.txt` with metadata.
+
+Then analyze the transcript directly as an AI agent:
+
+**Analysis Prompt Template**:
+```
+请详细分析以下视频转录内容，提取实质性知识点（不要说"视频介绍了"这类元描述）：
+
+# {标题}
+- UP主: {UP主}
+- 时长: {时长}
+
+{转录文本}
+
+请按以下结构输出：
+1. 公司/主题基本信息
+2. 核心技术/概念详解（含具体数据）
+3. 对比分析（表格形式）
+4. 财务/业绩数据
+5. 风险与机会
+6. 结论建议
+```
 
 ### Step 4: Fact Check (Optional)
 
@@ -139,6 +170,15 @@ Options:
 - `--cookies PATH` — cookies.txt for member videos
 - `--no-fact-check` — Skip fact-checking (faster)
 - `--no-report` — Skip HTML report generation
+- `--agent-analyze` — Output transcript for AI agent analysis (skip LLM API)
+- `--skip-analysis` — Skip analysis, only do transcription
+- `--model NAME` — LLM model to use (default: glm-4-flash)
+
+**推荐使用 Agent 分析模式：**
+```bash
+python3 skills/bilibili_research/bilibili_research.py "https://www.bilibili.com/video/BV..." --agent-analyze
+```
+输出转录文件后，直接让 AI 分析可获得更高质量的内容。
 
 ## Error Handling
 

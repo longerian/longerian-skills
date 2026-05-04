@@ -92,7 +92,20 @@ def _create_analysis_prompt(
 5. 关键词（用于搜索相关资料，5-10个）
 6. 一句话总结（20-50字）
 
-7. 详细内容（对每个大纲要点，展开写3-5段详细说明）
+7. 详细内容（对每个大纲要点，直接写出视频中的具体知识点和信息）
+
+**重要**：详细内容必须直接输出实质性的知识，用第三人称客观陈述。
+
+❌ 错误示例（不要这样写）：
+- "视频介绍了Celebries公司的上市情况"
+- "UP主提到了公司的创始团队"
+- "视频中分析了AI芯片的技术路线"
+
+✅ 正确示例（应该这样写）：
+- "Celebries公司预计于2024年5月中旬上市，上市代码为CBRS。公司估值从上一轮的231亿美元上升至预计的351亿美元，涨幅约52%。"
+- "公司五位联合创始人在创立Celebries之前已合作近十年。CEO Andrew Feldman曾创立SeaMicro，该公司于2012年被AMD以3.3亿美元收购。"
+- "Celebries采用晶圆级芯片（Wafer-Scale Engine，WSE）技术路线，与Nvidia的GPU架构不同。WSE将整个晶圆作为单颗芯片，面积约为Nvidia H100 GPU的56倍。"
+
 8. 数据提取（提取视频中提到的所有数值数据，包括标签、数值、单位、分类和上下文）
 
 标题: {title}
@@ -247,7 +260,7 @@ def analyze_content(
     base_url: Optional[str] = None,
     model: str = "glm-4-flash",
     enhanced: bool = True,
-    timeout: int = 120,
+    timeout: int = 300,
     max_retries: int = 2
 ) -> AnalysisResult | EnhancedAnalysisResult:
     """
@@ -268,9 +281,11 @@ def analyze_content(
         AnalysisResult or EnhancedAnalysisResult with extracted insights
     """
     # Configure API client
+    # Check multiple env vars: api_key param > ZHIPU_API_KEY > OPENAI_API_KEY > ANTHROPIC_API_KEY
+    # Default base URL is GLM coding endpoint
     client = OpenAI(
-        api_key=api_key or os.environ.get('OPENAI_API_KEY') or os.environ.get('ANTHROPIC_API_KEY'),
-        base_url=base_url or os.environ.get('OPENAI_API_BASE')
+        api_key=api_key or os.environ.get('ZHIPU_API_KEY') or os.environ.get('OPENAI_API_KEY') or os.environ.get('ANTHROPIC_API_KEY'),
+        base_url=base_url or os.environ.get('OPENAI_API_BASE') or os.environ.get('ZHIPU_API_BASE', 'https://open.bigmodel.cn/api/coding/paas/v4')
     )
 
     # Build metadata string
@@ -288,7 +303,7 @@ def analyze_content(
             response = client.chat.completions.create(
                 model=model,
                 messages=[
-                    {'role': 'system', 'content': '你是一个专业的内容分析助手，擅长从视频转录文本中提取关键信息和数据。'},
+                    {'role': 'system', 'content': '你是一个专业的内容分析助手，擅长从视频转录文本中提取关键信息和数据。**重要**：生成详细内容时，直接输出具体的知识点、事实和数据，用第三人称客观陈述。绝对不要说"视频介绍了""UP主提到""视频中说道"等元描述语言。读者想直接获得知识，而不是知道视频讲了什么。'},
                     {'role': 'user', 'content': prompt}
                 ],
                 temperature=0.3,
