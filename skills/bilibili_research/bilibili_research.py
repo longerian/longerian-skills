@@ -63,54 +63,38 @@ def format_duration(seconds: int) -> str:
 
 
 def generate_analysis_prompt(title: str, uploader: str, duration: str, transcript: str) -> str:
-    """Generate the analysis prompt for AI Agent."""
-    return f"""请详细分析以下视频转录内容，提取实质性知识点（不要说"视频介绍了"这类元描述）：
+    """Generate the adaptive analysis prompt for AI Agent.
 
+    The prompt is designed to let AI identify content type and generate
+    appropriate report structure automatically, not using a fixed template.
+    """
+    return f"""请详细分析以下视频转录内容。
+
+**任务：识别内容类型并生成适配的分析报告**
+
+首先判断视频的内容类型（公司分析、技术教程、评论观点、新闻资讯、访谈对话、其他等），然后根据类型生成适配的报告结构。
+
+不要使用固定的"技术/概念详解"、"数据汇总"、"对比分析"等模板章节。让 AI 根据内容特点自行决定报告的结构和章节标题。
+
+例如：
+- 公司分析：公司概况、财务表现、产品技术、竞争格局、发展前景
+- 技术教程：背景介绍、核心概念、实现步骤、注意事项、延伸阅读
+- 评论观点：事件背景、各方观点、分析论证、结论判断
+- 新闻资讯：事件要素、时间线、相关方、影响分析
+
+**要求：**
+1. 提取实质性知识点，不要说"视频介绍了"这类元描述
+2. 用第三人称客观陈述
+3. 根据内容类型自适应报告结构
+
+---
 # {title}
 - UP主: {uploader}
 - 时长: {duration}
 
 {transcript}
 
-请按以下结构输出分析报告：
-
-## 一、核心主题
-简要概述视频的核心主题（2-3句话）
-
-## 二、关键信息点
-提取视频中的关键信息点，每点用具体数据支撑：
-- 信息点1（含具体数据）
-- 信息点2（含具体数据）
-- ...
-
-## 三、技术/概念详解
-对视频中的技术概念或专业术语进行详细解释：
-1. 概念名称：具体说明
-2. 概念名称：具体说明
-...
-
-## 四、数据汇总
-用表格形式汇总视频中提到的关键数据：
-
-| 指标 | 数值 | 单位 | 说明 |
-|------|------|------|------|
-| ... | ... | ... | ... |
-
-## 五、对比分析
-如果视频涉及对比分析，请整理成表格：
-
-| 项目 | 方案A | 方案B | 说明 |
-|------|-------|-------|------|
-| ... | ... | ... | ... |
-
-## 六、风险与机会
-- **机会**：列出1-3点
-- **风险**：列出1-3点
-
-## 七、结论
-总结视频的核心结论（2-3句话）
-
-请直接输出实质性内容，用第三人称客观陈述。"""
+请根据内容类型生成适配的分析报告。"""
 
 
 def generate_full_report(result, transcript: str, url: str, video_id: str, timestamp: str, args) -> int:
@@ -253,29 +237,93 @@ def generate_full_report(result, transcript: str, url: str, video_id: str, times
     return 0
 
 
+def generate_agent_mode_output(result, transcript: str, url: str, video_id: str, timestamp: str) -> int:
+    """Generate transcript and prompt for AI Agent analysis."""
+    # Save transcript
+    transcript_file = OUTPUT_DIR / f'transcript_{video_id}_{timestamp}.txt'
+    with open(transcript_file, 'w', encoding='utf-8') as f:
+        f.write(f"# {result.title}\n\n")
+        f.write(f"**视频信息**\n")
+        f.write(f"- URL: {url}\n")
+        f.write(f"- UP主: {result.uploader}\n")
+        f.write(f"- 时长: {format_duration(result.duration)}\n")
+        f.write(f"- 视频ID: {video_id}\n")
+        f.write(f"\n**转录文本**\n\n")
+        f.write(transcript)
+
+    print(f"📝 转录已保存到: {transcript_file}")
+    print(f"📏 转录文本: {len(transcript)} 字符")
+    print()
+
+    # Generate analysis prompt
+    analysis_prompt_file = OUTPUT_DIR / f'prompt_{video_id}_{timestamp}.txt'
+    prompt = generate_analysis_prompt(
+        title=result.title,
+        uploader=result.uploader,
+        duration=format_duration(result.duration),
+        transcript=transcript
+    )
+
+    with open(analysis_prompt_file, 'w', encoding='utf-8') as f:
+        f.write(prompt)
+
+    print(f"📋 分析提示已保存到: {analysis_prompt_file}")
+    print()
+    print("=" * 60)
+    print("💡 让 AI Agent 分析此视频")
+    print("=" * 60)
+    print()
+    print("请 AI 读取并分析:")
+    print(f"   {analysis_prompt_file}")
+    print()
+
+    return 0
+
+
+def generate_prompt_only(result, transcript: str, url: str, video_id: str, timestamp: str) -> int:
+    """Generate only the analysis prompt template."""
+    analysis_prompt_file = OUTPUT_DIR / f'prompt_{video_id}_{timestamp}.txt'
+    prompt = generate_analysis_prompt(
+        title=result.title,
+        uploader=result.uploader,
+        duration=format_duration(result.duration),
+        transcript=transcript
+    )
+
+    with open(analysis_prompt_file, 'w', encoding='utf-8') as f:
+        f.write(prompt)
+
+    print(f"📋 分析提示已保存到: {analysis_prompt_file}")
+    print()
+    print("💡 让 AI Agent 分析此视频:")
+    print(f"   请 AI 读取: {analysis_prompt_file}")
+    print()
+
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Bilibili Video Research Assistant - Extract and analyze video content',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Modes:
-  (default)     Agent mode - Extract transcript for AI Agent analysis
-  --report       Report mode - Generate full HTML/Markdown report with charts
+  (default)     Report mode - Generate full HTML/Markdown report with charts
+  --agent-mode   Agent mode - Extract transcript for AI Agent analysis
   --prompt-only  Prompt mode - Only generate analysis prompt template
 
 Examples:
   python bilibili_research.py "https://www.bilibili.com/video/BV..."
-  python bilibili_research.py "https://www.bilibili.com/video/BV..." --report
+  python bilibili_research.py "https://www.bilibili.com/video/BV..." --agent-mode
   python bilibili_research.py "https://www.bilibili.com/video/BV..." --prompt-only
         """
     )
     parser.add_argument('url', help='Bilibili video URL')
     parser.add_argument('--cookies', help='Path to cookies.txt for member videos')
-    parser.add_argument('--skip-report', action='store_true', help='Skip report generation, only save transcript')
-    parser.add_argument('--report', action='store_true', help='Generate full HTML/Markdown report with charts')
-    parser.add_argument('--prompt-only', action='store_true', help='Only generate analysis prompt template')
+    parser.add_argument('--agent-mode', action='store_true', help='Agent mode: extract transcript for AI Agent analysis (default is report mode)')
+    parser.add_argument('--prompt-only', action='store_true', help='Prompt mode: only generate analysis prompt template')
     parser.add_argument('--no-charts', action='store_true', help='Skip chart generation in report mode')
-    parser.add_argument('--basic', action='store_true', help='Use basic analysis (no detailed content)')
+    parser.add_argument('--basic', action='store_true', help='Use basic analysis (faster, no detailed content)')
     parser.add_argument('--model', default='glm-4-flash', help='LLM model for report generation (default: glm-4-flash)')
     parser.add_argument('--open', action='store_true', help='Open HTML report in browser after generation')
     args = parser.parse_args()
@@ -345,65 +393,22 @@ Examples:
     print(f"📏 转录文本: {len(transcript)} 字符")
     print()
 
-    if args.skip_report:
-        print("💡 跳过报告生成（使用 --skip-report 选项）")
-        return 0
-
-    # Report mode: Generate full report with LLM analysis
-    if args.report:
-        return generate_full_report(
-            result, transcript, url, video_id, timestamp, args
+    # Agent mode: Extract transcript for AI Agent (explicit opt-in)
+    if args.agent_mode:
+        return generate_agent_mode_output(
+            result, transcript, url, video_id, timestamp
         )
 
     # Prompt-only mode: Only generate prompt template
     if args.prompt_only:
-        analysis_prompt_file = OUTPUT_DIR / f'prompt_{video_id}_{timestamp}.txt'
-        prompt = generate_analysis_prompt(
-            title=result.title,
-            uploader=result.uploader,
-            duration=format_duration(result.duration),
-            transcript=transcript
+        return generate_prompt_only(
+            result, transcript, url, video_id, timestamp
         )
 
-        with open(analysis_prompt_file, 'w', encoding='utf-8') as f:
-            f.write(prompt)
-
-        print(f"📋 分析提示已保存到: {analysis_prompt_file}")
-        print()
-        print("💡 让 AI Agent 分析此视频:")
-        print(f"   请 AI 读取并分析: {analysis_prompt_file}")
-        return 0
-
-    # Default: Agent mode with next steps
-    analysis_prompt_file = OUTPUT_DIR / f'prompt_{video_id}_{timestamp}.txt'
-    prompt = generate_analysis_prompt(
-        title=result.title,
-        uploader=result.uploader,
-        duration=format_duration(result.duration),
-        transcript=transcript
+    # Default: Report mode - Generate full HTML/Markdown report with LLM analysis
+    return generate_full_report(
+        result, transcript, url, video_id, timestamp, args
     )
-
-    with open(analysis_prompt_file, 'w', encoding='utf-8') as f:
-        f.write(prompt)
-
-    print(f"📋 分析提示已保存到: {analysis_prompt_file}")
-    print()
-    print("=" * 60)
-    print("💡 下一步: 让 AI Agent 分析此视频")
-    print("=" * 60)
-    print()
-    print("方案 A - 直接让 AI 读取分析提示文件:")
-    print(f"   请 AI 读取并分析: {analysis_prompt_file}")
-    print()
-    print("方案 B - AI 读取转录文件后使用提示模板:")
-    print(f"   1. 读取转录: {transcript_file}")
-    print("   2. 使用结构化分析提示（见 SKILL.md）")
-    print()
-    print("方案 C - 生成完整报告:")
-    print(f"   python bilibili_research.py {url} --report")
-    print()
-
-    return 0
 
 
 if __name__ == '__main__':

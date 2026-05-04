@@ -7,8 +7,10 @@ version: 2.0.0
 # Bilibili 视频研究助手
 
 从 Bilibili 视频提取字幕/转录文本，支持三种模式：
-1. **Agent 模式**（默认）：提取转录文本供 AI Agent 分析
-2. **报告模式**：生成完整的 HTML/Markdown 报告，包含图表和 AI 分析
+1. **报告模式**（默认）：生成完整的 HTML/Markdown 报告，包含图表和 AI 分析
+   - 自适应报告结构（根据内容类型自动调整章节）
+   - 支持公司分析、技术教程、评论观点、新闻资讯、访谈对话等
+2. **Agent 模式**：提取转录文本供 AI Agent 分析
 3. **提示模式**：仅生成 AI 分析提示模板
 
 ## Prerequisites
@@ -126,11 +128,11 @@ Output:
 ## CLI Usage
 
 ```bash
-# Agent 模式（默认）- 提取转录供 AI Agent 分析
+# 报告模式（默认）- 生成完整 HTML/Markdown 报告（需要 LLM API）
 python3 bilibili_research.py "https://www.bilibili.com/video/BV..."
 
-# 报告模式 - 生成完整 HTML/Markdown 报告（需要 LLM API）
-python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --report
+# Agent 模式 - 提取转录供 AI Agent 分析
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --agent-mode
 
 # 提示模式 - 仅生成分析提示模板
 python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --prompt-only
@@ -139,21 +141,20 @@ python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --prompt-onl
 python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --cookies cookies.txt
 
 # 报告模式 + 在浏览器中打开
-python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --report --open
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --open
 
 # 使用基础分析（更快，但无详细章节和图表）
-python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --report --basic
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --basic
 ```
 
 **Options:**
 - `--cookies PATH` — cookies.txt for member videos
-- `--report` — Generate full HTML/Markdown report with charts (requires LLM API)
-- `--prompt-only` — Only generate analysis prompt template
+- `--agent-mode` — Agent mode: extract transcript for AI Agent analysis (default is report mode)
+- `--prompt-only` — Prompt mode: only generate analysis prompt template
 - `--no-charts` — Skip chart generation in report mode
 - `--basic` — Use basic analysis (faster, no detailed content)
 - `--model MODEL` — LLM model for report generation (default: glm-4-flash)
 - `--open` — Open HTML report in browser after generation
-- `--skip-report` — Skip all report generation
 
 ## Error Handling
 
