@@ -159,7 +159,7 @@ def _render_detailed_sections_html(sections: list) -> str:
     if not sections:
         return ""
 
-    html = ['<h2>详细内容</h2>']
+    parts = ['<h2>详细内容</h2>']
 
     for section in sections:
         heading = html.escape(section.get('heading', ''))
@@ -168,18 +168,18 @@ def _render_detailed_sections_html(sections: list) -> str:
         # Split content by double newlines into paragraphs
         paragraphs = content.split('\n\n')
 
-        html.append(f'''
+        parts.append(f'''
         <div class="detailed-section">
             <h4>{heading}</h4>''')
 
         for para in paragraphs:
             para = para.strip()
             if para:
-                html.append(f'<p>{html.escape(para)}</p>')
+                parts.append(f'<p>{html.escape(para)}</p>')
 
-        html.append('</div>')
+        parts.append('</div>')
 
-    return '\n'.join(html)
+    return '\n'.join(parts)
 
 
 def _render_charts_html(charts: list, output_dir: str) -> str:
@@ -187,7 +187,7 @@ def _render_charts_html(charts: list, output_dir: str) -> str:
     if not charts:
         return ""
 
-    html = ['<h2>数据可视化</h2>']
+    parts = ['<h2>数据可视化</h2>']
 
     for chart in charts:
         # Use relative path from output directory
@@ -196,13 +196,16 @@ def _render_charts_html(charts: list, output_dir: str) -> str:
         except ValueError:
             rel_path = chart.file_path
 
-        html.append(f'''
+        # Escape title for HTML safety (LLM-generated content)
+        safe_title = html.escape(chart.title)
+
+        parts.append(f'''
         <div class="chart-container">
-            <img src="{rel_path}" alt="{chart.title}">
-            <p class="chart-caption">{chart.title} ({chart.data_count} 个数据点)</p>
+            <img src="{rel_path}" alt="{safe_title}">
+            <p class="chart-caption">{safe_title} ({chart.data_count} 个数据点)</p>
         </div>''')
 
-    return '\n'.join(html)
+    return '\n'.join(parts)
 
 
 def generate_html_report(
