@@ -1,17 +1,30 @@
 ---
 name: bilibili-research
 description: Use when user wants to analyze a Bilibili video or extract transcript for AI analysis. Triggers on Bilibili URLs (bilibili.com, b23.tv) or when keywords like "analyze", "研究", "提取", "transcribe" are provided.
-version: 1.0.0
+version: 2.0.0
 ---
 
 # Bilibili 视频研究助手
 
-从 Bilibili 视频提取字幕/转录文本，供 AI Agent 分析。
+从 Bilibili 视频提取字幕/转录文本，支持三种模式：
+1. **Agent 模式**（默认）：提取转录文本供 AI Agent 分析
+2. **报告模式**：生成完整的 HTML/Markdown 报告，包含图表和 AI 分析
+3. **提示模式**：仅生成 AI 分析提示模板
 
 ## Prerequisites
 
 - Python 3.10+
 - Virtual environment with skill dependencies
+
+**Agent/提示模式**:
+- yt-dlp（视频提取）
+- ffmpeg（音频处理，可选）
+- openai-whisper（转录，无字幕时需要）
+
+**报告模式**（额外需要）:
+- LLM API key (`OPENAI_API_KEY` 或 `ZHIPU_API_KEY`)
+- matplotlib（图表生成）
+- openai（API 调用）
 
 ## Directory Convention
 
@@ -57,7 +70,7 @@ Returns:
 If no subtitles found, transcribe audio using Whisper:
 
 ```python
-from shared.whisper_wrapper import transcribe
+from skills.bilibili_research.whisper_wrapper import transcribe
 
 transcription = transcribe(result.audio_path, language='zh')
 transcript = transcription['text']
@@ -65,21 +78,39 @@ transcript = transcription['text']
 
 **Note**: Uses Whisper models from `~/.cache/whisper/`. Models auto-download on first use.
 
-### Step 3: Analyze with AI Agent
+### Step 3: Choose Analysis Mode
 
-The script generates two files:
+**Agent 模式（默认）** - 提取转录供 AI Agent 分析:
 
 ```bash
-python3 skills/bilibili_research/bilibili_research.py "https://www.bilibili.com/video/BV..."
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..."
 ```
 
-Output files:
+Output:
 - `transcript_{VIDEO_ID}_{TIMESTAMP}.txt` — 原始转录文本
 - `prompt_{VIDEO_ID}_{TIMESTAMP}.txt` — AI 分析提示模板
 
-**让 AI Agent 分析:**
-1. 读取 `prompt_*.txt` 文件，其中已包含完整转录和分析提示
-2. AI 直接按提示结构输出分析报告
+**报告模式** - 生成完整 HTML/Markdown 报告:
+
+```bash
+# 需要设置 OPENAI_API_KEY 或 ZHIPU_API_KEY 环境变量
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --report
+```
+
+Output:
+- `transcript_{VIDEO_ID}_{TIMESTAMP}.txt` — 原始转录文本
+- `report_{VIDEO_ID}_{TIMESTAMP}.html` — HTML 报告（含图表）
+- `report_{VIDEO_ID}_{TIMESTAMP}.md` — Markdown 报告
+- `chart_*.png` — 数据可视化图表
+
+**提示模式** - 仅生成分析提示模板:
+
+```bash
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --prompt-only
+```
+
+Output:
+- `prompt_{VIDEO_ID}_{TIMESTAMP}.txt` — AI 分析提示模板
 
 **报告结构:**
 ```markdown
@@ -95,15 +126,34 @@ Output files:
 ## CLI Usage
 
 ```bash
-# 基本用法
-python3 skills/bilibili_research/bilibili_research.py "https://www.bilibili.com/video/BV..."
+# Agent 模式（默认）- 提取转录供 AI Agent 分析
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..."
+
+# 报告模式 - 生成完整 HTML/Markdown 报告（需要 LLM API）
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --report
+
+# 提示模式 - 仅生成分析提示模板
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --prompt-only
 
 # 会员视频（需要 cookies）
-python3 skills/bilibili_research/bilibili_research.py "https://www.bilibili.com/video/BV..." --cookies cookies.txt
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --cookies cookies.txt
+
+# 报告模式 + 在浏览器中打开
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --report --open
+
+# 使用基础分析（更快，但无详细章节和图表）
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --report --basic
 ```
 
-Options:
+**Options:**
 - `--cookies PATH` — cookies.txt for member videos
+- `--report` — Generate full HTML/Markdown report with charts (requires LLM API)
+- `--prompt-only` — Only generate analysis prompt template
+- `--no-charts` — Skip chart generation in report mode
+- `--basic` — Use basic analysis (faster, no detailed content)
+- `--model MODEL` — LLM model for report generation (default: glm-4-flash)
+- `--open` — Open HTML report in browser after generation
+- `--skip-report` — Skip all report generation
 
 ## Error Handling
 
