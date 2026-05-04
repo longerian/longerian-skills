@@ -4,6 +4,7 @@ Uses matplotlib to generate static PNG charts for reports.
 """
 
 import os
+import html
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass
@@ -340,11 +341,14 @@ def chart_to_html(chart: GeneratedChart, base_dir: str = "") -> str:
     else:
         rel_path = chart.file_path
 
+    # Escape title for HTML safety (LLM-generated content)
+    safe_title = html.escape(chart.title)
+
     return f'''
 <div class="chart-container" style="margin: 20px 0;">
-    <img src="{rel_path}" alt="{chart.title}" style="max-width: 100%; border: 1px solid #e0e0e0; border-radius: 4px;">
+    <img src="{rel_path}" alt="{safe_title}" style="max-width: 100%; border: 1px solid #e0e0e0; border-radius: 4px;">
     <p style="text-align: center; font-size: 14px; color: #666; margin-top: 8px;">
-        {chart.title} ({chart.data_count} 个数据点)
+        {safe_title} ({chart.data_count} 个数据点)
     </p>
 </div>'''
 

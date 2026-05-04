@@ -4,6 +4,7 @@ Generates HTML and Markdown reports with embedded charts.
 """
 
 import os
+import html
 import webbrowser
 from pathlib import Path
 from datetime import datetime
@@ -161,7 +162,7 @@ def _render_detailed_sections_html(sections: list) -> str:
     html = ['<h2>详细内容</h2>']
 
     for section in sections:
-        heading = section.get('heading', '')
+        heading = html.escape(section.get('heading', ''))
         content = section.get('content', '')
 
         # Split content by double newlines into paragraphs
@@ -174,7 +175,7 @@ def _render_detailed_sections_html(sections: list) -> str:
         for para in paragraphs:
             para = para.strip()
             if para:
-                html.append(f'<p>{para}</p>')
+                html.append(f'<p>{html.escape(para)}</p>')
 
         html.append('</div>')
 
