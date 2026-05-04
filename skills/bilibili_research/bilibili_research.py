@@ -9,11 +9,29 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+# Handle both direct execution and module import
+# When installed, the script is in .claude/skills/bilibili-research/
+# When developing, the script is in skills/bilibili_research/
+current_dir = Path(__file__).parent
+if (current_dir.parent.name == 'skills' and current_dir.parent.parent.name == '.claude'):
+    # Installed environment: .claude/skills/bilibili-research/
+    # Add project root to sys.path for shared modules if available
+    project_root = current_dir.parent.parent.parent
+    if (project_root / 'shared').exists():
+        sys.path.insert(0, str(project_root))
+elif current_dir.parent.name == 'skills':
+    # Development environment: skills/bilibili_research/
+    # Add project root to sys.path
+    sys.path.insert(0, str(current_dir.parent.parent))
 
-from skills.bilibili_research.extractor import extract, parse_bilibili_url
-from shared.whisper_wrapper import transcribe
+# Try relative import first (works when run as module)
+try:
+    from .extractor import extract, parse_bilibili_url
+    from .whisper_wrapper import transcribe
+except ImportError:
+    # Fall back to absolute import (works when script is run directly)
+    from extractor import extract, parse_bilibili_url
+    from whisper_wrapper import transcribe
 
 
 # Directory conventions
