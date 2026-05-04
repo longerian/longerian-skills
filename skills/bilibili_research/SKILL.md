@@ -67,31 +67,29 @@ transcript = transcription['text']
 
 ### Step 3: Analyze with AI Agent
 
-The script saves the transcript to a file for AI agent analysis:
+The script generates two files:
 
 ```bash
 python3 skills/bilibili_research/bilibili_research.py "https://www.bilibili.com/video/BV..."
 ```
 
-Output: `~/.longerian/data/bilibili-research/transcript_{VIDEO_ID}_{TIMESTAMP}.txt`
+Output files:
+- `transcript_{VIDEO_ID}_{TIMESTAMP}.txt` — 原始转录文本
+- `prompt_{VIDEO_ID}_{TIMESTAMP}.txt` — AI 分析提示模板
 
-**Analysis Prompt Template**:
-```
-请详细分析以下视频转录内容，提取实质性知识点（不要说"视频介绍了"这类元描述）：
+**让 AI Agent 分析:**
+1. 读取 `prompt_*.txt` 文件，其中已包含完整转录和分析提示
+2. AI 直接按提示结构输出分析报告
 
-# {标题}
-- UP主: {UP主}
-- 时长: {时长}
-
-{转录文本}
-
-请按以下结构输出：
-1. 公司/主题基本信息
-2. 核心技术/概念详解（含具体数据）
-3. 对比分析（表格形式）
-4. 财务/业绩数据
-5. 风险与机会
-6. 结论建议
+**报告结构:**
+```markdown
+## 一、核心主题
+## 二、关键信息点（含具体数据）
+## 三、技术/概念详解
+## 四、数据汇总（表格）
+## 五、对比分析（表格）
+## 六、风险与机会
+## 七、结论
 ```
 
 ## CLI Usage
