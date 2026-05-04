@@ -10,23 +10,26 @@ version: 1.0.0
 
 ## Prerequisites
 
-- Python 3.x
-- `yt-dlp` — Bilibili 内容提取
-- `openai-whisper` — 音频转录（无字幕视频）
-- `anthropic` — AI 内容分析
-- Environment variable `ANTHROPIC_API_KEY`
+- Python 3.10+
+- Virtual environment with skill dependencies
+- Environment variable `OPENAI_API_BASE` (for GLM) or `ANTHROPIC_API_KEY`
 
 ## Directory Convention
 
 ```
-~/.cache/whisper/            # Whisper 模型（与 podcast skill 共享）
+~/.cache/whisper/                 # Whisper 模型（与 podcast skill 共享）
 ~/.longerian/
-├── data/bilibili-research/  # 音频、字幕、报告输出
-└── scripts/                 # 共享脚本
+├── venv/bilibili-research/       # Skill 虚拟环境（运行时）
+├── data/bilibili-research/       # 音频、字幕、报告输出
+└── scripts/                      # 共享脚本
 ```
 
 Setup:
 ```bash
+# 运行环境设置脚本（自动创建虚拟环境并安装依赖）
+./skills/bilibili_research/setup_env.sh
+
+# 创建输出目录
 mkdir -p ~/.longerian/data/bilibili-research
 ```
 
@@ -122,10 +125,14 @@ open_report(report_path)  # Opens in browser
 
 ## CLI Usage
 
-Direct CLI execution:
-
+**使用虚拟环境运行：**
 ```bash
-python3 skills/bilibili-research/bilibili_research.py "https://www.bilibili.com/video/BV..."
+# 激活环境后运行
+source ~/.longerian/venv/bilibili-research/bin/activate
+python3 skills/bilibili_research/bilibili_research.py "https://www.bilibili.com/video/BV..."
+
+# 或直接运行
+~/.longerian/venv/bilibili-research/bin/python3 skills/bilibili_research/bilibili_research.py "https://www.bilibili.com/video/BV..."
 ```
 
 Options:
@@ -194,21 +201,45 @@ Bilibili videos may have multiple parts (P1, P2, ...).
 📌 [一句话总结]
 ```
 
-## Dependencies
+## Runtime Environment
 
-Install external tools:
+This skill uses an isolated Python virtual environment:
+
 ```bash
+# 激活 skill 虚拟环境
+source ~/.longerian/venv/bilibili-research/bin/activate
+
+# 或直接运行
+~/.longerian/venv/bilibili-research/bin/python3 <script>
+```
+
+## Installation
+
+**自动安装（推荐）：**
+```bash
+# 运行环境设置脚本
+./skills/bilibili_research/setup_env.sh
+```
+
+**手动安装：**
+```bash
+# 安装外部工具
 brew install yt-dlp ffmpeg  # macOS
 # or
 apt install yt-dlp ffmpeg   # Linux
+
+# 创建虚拟环境并安装依赖
+python3 -m venv ~/.longerian/venv/bilibili-research
+source ~/.longerian/venv/bilibili-research/bin/activate
+pip install -r requirements.txt
 ```
 
-Install Python packages:
+**API 配置：**
 ```bash
-pip install yt-dlp openai-whisper anthropic
-```
+# GLM (OpenAI-compatible)
+export OPENAI_API_BASE="https://open.bigmodel.cn/api/paas/v4/"
+export OPENAI_API_KEY="your-glm-api-key"
 
-Set API key:
-```bash
+# 或 Anthropic Claude
 export ANTHROPIC_API_KEY="sk-..."
 ```

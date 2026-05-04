@@ -1,15 +1,19 @@
 """
-Shared HTML report generation module.
-Generates clean, responsive HTML reports using Jinja2 templates.
+Shared report generation module.
+Generates HTML and Markdown reports with embedded charts.
 """
 
 import os
 import webbrowser
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from dataclasses import dataclass, asdict
 
+
+# ============================================================================
+# Data Structures
+# ============================================================================
 
 @dataclass
 class FactCheckResult:
@@ -31,16 +35,49 @@ class RelatedReading:
 
 
 @dataclass
+class GeneratedChart:
+    """Result of chart generation."""
+    file_path: str
+    chart_type: str
+    title: str
+    data_count: int
+
+
+@dataclass
+class DetailedSection:
+    """A detailed section with full content."""
+    heading: str
+    content: str
+    timestamps: list[int] = None
+
+    def __post_init__(self):
+        if self.timestamps is None:
+            self.timestamps = []
+
+
+@dataclass
 class ReportData:
     """Complete report data."""
     video_info: dict
-    analysis: dict  # AnalysisResult as dict
-    fact_checks: list[dict]  # FactCheckResult as dict
-    related_reading: list[dict]  # RelatedReading as dict
-    generated_at: str
+    analysis: dict
+    fact_checks: list[dict] = None
+    related_reading: list[dict] = None
+    generated_at: str = None
+    charts: list[GeneratedChart] = None
+
+    def __post_init__(self):
+        if self.fact_checks is None:
+            self.fact_checks = []
+        if self.related_reading is None:
+            self.related_reading = []
+        if self.charts is None:
+            self.charts = []
 
 
-# Simple HTML template (no external Jinja2 dependency for prototype)
+# ============================================================================
+# HTML Report Generation
+# ============================================================================
+
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -49,7 +86,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <title>{title} - 研究报告</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; color: #333; background: #f5f5f5; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.6; color: #333; background: #f5f5f5; }}
         .container {{ max-width: 900px; margin: 40px auto; padding: 40px; background: white; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }}
         h1 {{ font-size: 28px; margin-bottom: 8px; color: #111; }}
         .meta {{ color: #666; font-size: 14px; margin-bottom: 30px; }}
@@ -60,6 +97,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         ul {{ padding-left: 20px; }}
         li {{ margin: 8px 0; }}
         .summary {{ background: #f0f7ff; padding: 20px; border-radius: 6px; border-left: 4px solid #0066cc; margin: 20px 0; font-size: 16px; }}
+        .detailed-section {{ margin: 25px 0; padding: 20px; background: #fafafa; border-radius: 6px; border-left: 3px solid #ddd; }}
+        .detailed-section h4 {{ color: #333; margin-bottom: 12px; font-size: 15px; }}
+        .detailed-section p {{ margin-bottom: 10px; line-height: 1.8; text-align: justify; }}
         .claim {{ background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 4px; }}
         .claim.verified {{ border-left: 4px solid #28a745; }}
         .claim.unverified {{ border-left: 4px solid #dc3545; }}
@@ -69,6 +109,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .reading a {{ color: #0066cc; text-decoration: none; font-weight: 500; }}
         .reading a:hover {{ text-decoration: underline; }}
         .reading .source {{ font-size: 12px; color: #888; margin-top: 4px; }}
+        .chart-container {{ margin: 25px 0; text-align: center; }}
+        .chart-container img {{ max-width: 100%; border: 1px solid #e0e0e0; border-radius: 4px; }}
+        .chart-caption {{ font-size: 13px; color: #666; margin-top: 8px; }}
         .footer {{ margin-top: 40px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; }}
     </style>
 </head>
@@ -86,6 +129,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             {outline_items}
         </ul>
 
+        {detailed_sections}
+
         <h2>核心观点</h2>
         <ul>
             {core_points}
@@ -93,6 +138,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         <h2>关键实体</h2>
         <p>{key_entities}</p>
+
+        {charts_section}
 
         {fact_check_section}
 
@@ -104,6 +151,57 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
 </body>
 </html>"""
+
+
+def _render_detailed_sections_html(sections: list) -> str:
+    """Render detailed sections as HTML."""
+    if not sections:
+        return ""
+
+    html = ['<h2>详细内容</h2>']
+
+    for section in sections:
+        heading = section.get('heading', '')
+        content = section.get('content', '')
+
+        # Split content by double newlines into paragraphs
+        paragraphs = content.split('\n\n')
+
+        html.append(f'''
+        <div class="detailed-section">
+            <h4>{heading}</h4>''')
+
+        for para in paragraphs:
+            para = para.strip()
+            if para:
+                html.append(f'<p>{para}</p>')
+
+        html.append('</div>')
+
+    return '\n'.join(html)
+
+
+def _render_charts_html(charts: list, output_dir: str) -> str:
+    """Render charts as HTML."""
+    if not charts:
+        return ""
+
+    html = ['<h2>数据可视化</h2>']
+
+    for chart in charts:
+        # Use relative path from output directory
+        try:
+            rel_path = os.path.relpath(chart.file_path, output_dir)
+        except ValueError:
+            rel_path = chart.file_path
+
+        html.append(f'''
+        <div class="chart-container">
+            <img src="{rel_path}" alt="{chart.title}">
+            <p class="chart-caption">{chart.title} ({chart.data_count} 个数据点)</p>
+        </div>''')
+
+    return '\n'.join(html)
 
 
 def generate_html_report(
@@ -126,6 +224,8 @@ def generate_html_report(
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         output_path = str(output_dir / f'report_{timestamp}.html')
 
+    output_dir = str(Path(output_path).parent)
+
     # Build outline items
     outline_items = '\n            '.join(
         f'<li>{item}</li>' for item in data.analysis.get('outline', [])
@@ -142,6 +242,14 @@ def generate_html_report(
     # Build summary section
     summary = data.analysis.get('summary', '')
     summary_section = f'<div class="summary">{summary}</div>' if summary else ''
+
+    # Build detailed sections
+    detailed_sections = _render_detailed_sections_html(
+        data.analysis.get('detailed_sections', [])
+    )
+
+    # Build charts section
+    charts_section = _render_charts_html(data.charts or [], output_dir)
 
     # Build fact-check section
     fact_check_html = ''
@@ -178,11 +286,13 @@ def generate_html_report(
         url=data.video_info.get('url', ''),
         summary_section=summary_section,
         outline_items=outline_items,
+        detailed_sections=detailed_sections,
         core_points=core_points,
         key_entities=key_entities,
+        charts_section=charts_section,
         fact_check_section=fact_check_html,
         reading_section=reading_html,
-        generated_at=data.generated_at
+        generated_at=data.generated_at or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     )
 
     # Write file
@@ -191,10 +301,9 @@ def generate_html_report(
     return output_path
 
 
-def open_report(html_path: str) -> None:
-    """Open HTML report in default browser."""
-    webbrowser.open(f'file://{html_path}')
-
+# ============================================================================
+# Markdown Report Generation
+# ============================================================================
 
 def generate_markdown_report(
     data: ReportData,
@@ -216,6 +325,7 @@ def generate_markdown_report(
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         output_path = str(output_dir / f'report_{timestamp}.md')
 
+    output_dir = str(Path(output_path).parent)
     lines = []
 
     # Header
@@ -238,6 +348,17 @@ def generate_markdown_report(
             lines.append(f'{i}. {item}')
         lines.append('')
 
+    # Detailed sections
+    detailed_sections = data.analysis.get('detailed_sections', [])
+    if detailed_sections:
+        lines.append('## 📖 详细内容\n')
+        for section in detailed_sections:
+            heading = section.get('heading', '')
+            content = section.get('content', '')
+            lines.append(f'### {heading}\n')
+            lines.append(content)
+            lines.append('')
+
     # Core points
     core_points = data.analysis.get('core_points', [])
     if core_points:
@@ -251,6 +372,21 @@ def generate_markdown_report(
     if entities:
         lines.append('## 🏷️ 关键实体\n\n')
         lines.append(' · '.join(entities) + '\n')
+
+    # Charts
+    charts = data.charts or []
+    if charts:
+        lines.append('## 📊 数据可视化\n')
+        for chart in charts:
+            try:
+                rel_path = os.path.relpath(chart.file_path, output_dir)
+            except ValueError:
+                rel_path = chart.file_path
+
+            lines.append(f'### {chart.title}\n')
+            lines.append(f'![{chart.title}]({rel_path})\n')
+            lines.append(f'*数据点数量: {chart.data_count}*\n')
+        lines.append('')
 
     # Fact checks
     if data.fact_checks:
@@ -273,10 +409,19 @@ def generate_markdown_report(
         lines.append('')
 
     # Footer
-    lines.append(f'---\n\n*生成时间: {data.generated_at}*')
+    lines.append(f'---\n\n*生成时间: {data.generated_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")}*')
 
     # Write file
     markdown = '\n'.join(lines)
     Path(output_path).write_text(markdown, encoding='utf-8')
 
     return output_path
+
+
+# ============================================================================
+# Utility Functions
+# ============================================================================
+
+def open_report(html_path: str) -> None:
+    """Open HTML report in default browser."""
+    webbrowser.open(f'file://{html_path}')
