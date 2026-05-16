@@ -1,40 +1,55 @@
 ---
 name: bilibili-research
-description: Use when user wants to analyze a Bilibili video: extract subtitles/transcript, generate outline, identify key points, fact-check claims, and produce a research report. Triggers on Bilibili URLs (bilibili.com, b23.tv) with analysis/intent keywords like "analyze", "研究", "提取", "outline", "summary".
-version: 1.0.0
+description: Use when user wants to analyze a Bilibili video or extract transcript for AI analysis. Triggers on Bilibili URLs (bilibili.com, b23.tv) or when keywords like "analyze", "研究", "提取", "transcribe" are provided.
+version: 2.0.0
 ---
 
 # Bilibili 视频研究助手
 
-从 Bilibili 视频生成研究报告：提取字幕/转录、分析要点、核查事实、提供扩展阅读。
+从 Bilibili 视频提取字幕/转录文本，支持三种模式：
+1. **报告模式**（默认）：生成完整的 HTML/Markdown 报告，包含图表和 AI 分析
+   - 自适应报告结构（根据内容类型自动调整章节）
+   - 支持公司分析、技术教程、评论观点、新闻资讯、访谈对话等
+2. **Agent 模式**：提取转录文本供 AI Agent 分析
+3. **提示模式**：仅生成 AI 分析提示模板
 
 ## Prerequisites
 
-- Python 3.x
-- `yt-dlp` — Bilibili 内容提取
-- `openai-whisper` — 音频转录（无字幕视频）
-- `anthropic` — AI 内容分析
-- Environment variable `ANTHROPIC_API_KEY`
+- Python 3.10+
+- Virtual environment with skill dependencies
+
+**Agent/提示模式**:
+- yt-dlp（视频提取）
+- ffmpeg（音频处理，可选）
+- openai-whisper（转录，无字幕时需要）
+
+**报告模式**（额外需要）:
+- LLM API key (`OPENAI_API_KEY` 或 `ZHIPU_API_KEY`)
+- matplotlib（图表生成）
+- openai（API 调用）
 
 ## Directory Convention
 
 ```
-~/.cache/whisper/            # Whisper 模型（与 podcast skill 共享）
+~/.cache/whisper/                 # Whisper 模型
 ~/.longerian/
-├── data/bilibili-research/  # 音频、字幕、报告输出
-└── scripts/                 # 共享脚本
+├── venv/bilibili-research/       # Skill 虚拟环境
+├── data/bilibili-research/       # 音频、转录文件输出
+└── scripts/                      # 共享脚本
 ```
 
 Setup:
 ```bash
+# 运行环境设置脚本（自动创建虚拟环境并安装依赖）
+./skills/bilibili_research/setup_env.sh
+
+# 创建输出目录
 mkdir -p ~/.longerian/data/bilibili-research
 ```
 
 ## Pipeline
 
-### Step 1: Extract Content (Agent)
-
-Use the extractor module to get video info and check for subtitles:
+### Step 1: Extract Content
 
 ```python
 from skills.bilibili_research.extractor import extract
@@ -52,86 +67,94 @@ Returns:
 - `transcript`: str (if subtitles available)
 - `audio_path`: str (if no subtitles)
 
-### Step 2: Transcribe if Needed (Agent)
+### Step 2: Transcribe if Needed
 
-If no subtitles found, transcribe audio using shared Whisper module:
+If no subtitles found, transcribe audio using Whisper:
 
 ```python
-from shared.whisper_wrapper import transcribe
+from skills.bilibili_research.whisper_wrapper import transcribe
 
 transcription = transcribe(result.audio_path, language='zh')
 transcript = transcription['text']
 ```
 
-**Note**: Uses Whisper models from `~/.cache/whisper/` (shared with podcast-transcribe-whisper). Models auto-download on first use.
+**Note**: Uses Whisper models from `~/.cache/whisper/`. Models auto-download on first use.
 
-### Step 3: Analyze Content (Agent)
+### Step 3: Choose Analysis Mode
 
-Extract outline, core points, entities, and verifiable claims:
+**Agent 模式（默认）** - 提取转录供 AI Agent 分析:
 
-```python
-from shared.analyzer import analyze_content
-
-analysis = analyze_content(
-    transcript=transcript,
-    title=result.title,
-    metadata={'uploader': result.uploader, 'url': url}
-)
+```bash
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..."
 ```
 
-Returns:
-- `outline`: 5-7 content outline points
-- `core_points`: 3-5 key insights
-- `key_entities`: people, places, terms
-- `verifiable_claims`: statements for fact-checking
-- `keywords`: for extended reading search
-- `summary`: one-line summary
+Output:
+- `transcript_{VIDEO_ID}_{TIMESTAMP}.txt` — 原始转录文本
+- `prompt_{VIDEO_ID}_{TIMESTAMP}.txt` — AI 分析提示模板
 
-### Step 4: Fact Check (Optional)
+**报告模式** - 生成完整 HTML/Markdown 报告:
 
-For each verifiable claim, use web search to verify:
+```bash
+# 需要设置 OPENAI_API_KEY 或 ZHIPU_API_KEY 环境变量
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --report
+```
 
-1. Search claim statement on web
-2. Analyze search results for supporting evidence
-3. Record verification status, confidence, evidence URLs
+Output:
+- `transcript_{VIDEO_ID}_{TIMESTAMP}.txt` — 原始转录文本
+- `report_{VIDEO_ID}_{TIMESTAMP}.html` — HTML 报告（含图表）
+- `report_{VIDEO_ID}_{TIMESTAMP}.md` — Markdown 报告
+- `chart_*.png` — 数据可视化图表
 
-### Step 5: Extended Reading (Optional)
+**提示模式** - 仅生成分析提示模板:
 
-Search for related materials based on keywords:
+```bash
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --prompt-only
+```
 
-1. Construct search query from top keywords
-2. Fetch 3-5 most relevant results
-3. Record title, URL, source, relevance score
+Output:
+- `prompt_{VIDEO_ID}_{TIMESTAMP}.txt` — AI 分析提示模板
 
-### Step 6: Generate Report
-
-```python
-from shared.report import generate_html_report, open_report, ReportData
-
-report_data = ReportData(
-    video_info={'title': ..., 'uploader': ..., 'duration_str': ..., 'url': ...},
-    analysis=analysis.__dict__,
-    fact_checks=[...],
-    related_reading=[...],
-    generated_at=timestamp
-)
-
-report_path = generate_html_report(report_data)
-open_report(report_path)  # Opens in browser
+**报告结构:**
+```markdown
+## 一、核心主题
+## 二、关键信息点（含具体数据）
+## 三、技术/概念详解
+## 四、数据汇总（表格）
+## 五、对比分析（表格）
+## 六、风险与机会
+## 七、结论
 ```
 
 ## CLI Usage
 
-Direct CLI execution:
-
 ```bash
-python3 skills/bilibili-research/bilibili_research.py "https://www.bilibili.com/video/BV..."
+# 报告模式（默认）- 生成完整 HTML/Markdown 报告（需要 LLM API）
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..."
+
+# Agent 模式 - 提取转录供 AI Agent 分析
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --agent-mode
+
+# 提示模式 - 仅生成分析提示模板
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --prompt-only
+
+# 会员视频（需要 cookies）
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --cookies cookies.txt
+
+# 报告模式 + 在浏览器中打开
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --open
+
+# 使用基础分析（更快，但无详细章节和图表）
+python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --basic
 ```
 
-Options:
+**Options:**
 - `--cookies PATH` — cookies.txt for member videos
-- `--no-fact-check` — Skip fact-checking (faster)
-- `--no-report` — Skip HTML report generation
+- `--agent-mode` — Agent mode: extract transcript for AI Agent analysis (default is report mode)
+- `--prompt-only` — Prompt mode: only generate analysis prompt template
+- `--no-charts` — Skip chart generation in report mode
+- `--basic` — Use basic analysis (faster, no detailed content)
+- `--model MODEL` — LLM model for report generation (default: glm-4-flash)
+- `--open` — Open HTML report in browser after generation
 
 ## Error Handling
 
@@ -141,21 +164,7 @@ Options:
 | No subtitles + audio extraction fails | Prompt user to provide cookies or skip video |
 | Whisper not installed | `pip install openai-whisper modelscope` |
 | Transcription slow (no GPU) | Warn user: ~1 min per 10 min of audio |
-| Fact-check API fails | Continue without fact-checking, note in report |
 | Member video blocked | Prompt for cookies or skip |
-
-## Multi-Part Videos (多 P 视频)
-
-Bilibili videos may have multiple parts (P1, P2, ...).
-
-**Detection**: Check video info for `parts > 1`
-
-**User Choice**:
-- `all` — Process all parts, merge into one report
-- `1` — Process only part 1
-- `1,3` — Process specific parts
-
-**Default**: Process part 1 only
 
 ## Output Example
 
@@ -168,47 +177,29 @@ Bilibili videos may have multiple parts (P1, P2, ...).
    时长: 15分30秒
    字幕: 有
 
-🧠 正在分析内容...
-   ✅ 提取 6 个大纲要点
-   ✅ 提取 4 个核心观点
-   ✅ 识别 8 个关键实体
+📝 转录已保存到: ~/.longerian/data/bilibili-research/transcript_BV1xx411c7XD_20260504_120000.txt
+📏 转录文本: 12500 字符
 
-🔍 正在核查事实...
-   [1/3] [claim preview]...
-   [2/3] [claim preview]...
-   [3/3] [claim preview]...
-
-📄 正在生成报告...
-   ✅ 报告已生成: ~/.longerian/data/bilibili-research/report_20260503_143022.html
-
-🌐 正在打开浏览器...
-
-==================================================
-📊 分析完成
-==================================================
-📝 大纲: 6 个要点
-💡 核心观点: 4 条
-🔍 事实核查: 3 条
-📚 关键词: 7 个
-
-📌 [一句话总结]
+💡 下一步: 让 AI 分析此转录文件
+   可使用 Read 工具读取: ~/.longerian/data/bilibili-research/transcript_BV1xx411c7XD_20260504_120000.txt
 ```
 
-## Dependencies
+## Installation
 
-Install external tools:
+**自动安装（推荐）：**
 ```bash
+./skills/bilibili_research/setup_env.sh
+```
+
+**手动安装：**
+```bash
+# 安装外部工具
 brew install yt-dlp ffmpeg  # macOS
 # or
 apt install yt-dlp ffmpeg   # Linux
-```
 
-Install Python packages:
-```bash
-pip install yt-dlp openai-whisper anthropic
-```
-
-Set API key:
-```bash
-export ANTHROPIC_API_KEY="sk-..."
+# 创建虚拟环境并安装依赖
+python3 -m venv ~/.longerian/venv/bilibili-research
+source ~/.longerian/venv/bilibili-research/bin/activate
+pip install -r requirements.txt
 ```

@@ -1,11 +1,7 @@
 """
-Shared Whisper transcription wrapper.
-Uses Whisper for audio transcription.
+Whisper transcription wrapper for bilibili-research skill.
+Embedded for standalone installation - no external dependencies.
 """
-
-import os
-from pathlib import Path
-from typing import Optional
 
 
 def transcribe(

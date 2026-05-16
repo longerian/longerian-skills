@@ -6,6 +6,7 @@ Agent skills collection by longerian. Compatible with Claude Code, OpenClaw, Qod
 
 | Skill | Description |
 |-------|-------------|
+| [bilibili-research](skills/bilibili_research/SKILL.md) | Analyze Bilibili videos: extract subtitles, generate outlines, visualize data, produce research reports |
 | [podcast-transcribe-whisper](skills/podcast-transcribe-whisper/SKILL.md) | Local podcast transcription using Whisper large-v3-turbo |
 | [podcast-transcribe-mimo](skills/podcast-transcribe-mimo/SKILL.md) | Cloud podcast transcription using MiniMax MiMo v2.5 API |
 | [dii-estimator](skills/dii-estimator/SKILL.md) | Estimate Dietary Inflammatory Index (DII) from food photos |
@@ -31,6 +32,9 @@ The installer will auto-detect your installed agents and let you choose where to
 
 | Variable | Required | Description |
 |----------|----------|-------------|
+| `OPENAI_API_BASE` | For Bilibili skill | GLM API endpoint (OpenAI-compatible) |
+| `OPENAI_API_KEY` | For Bilibili skill | GLM API key |
+| `ANTHROPIC_API_KEY` | For Bilibili skill | Anthropic API key (alternative) |
 | `MIMO_API_KEY` | For MiMo skill | MiniMax MiMo API key |
 
 ## Whisper vs MiMo
