@@ -18,7 +18,7 @@ const OUTPUT_DIR = path.join(
     process.env.HOME || process.env.USERPROFILE,
     '.longerian/data/douyin'
 );
-const PYTHON_BIN = '/c/Users/Administrator/AppData/Local/Programs/Python/Python312/python.exe';
+const PYTHON_BIN = 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe';
 
 // Colors for terminal output
 const colors = {
@@ -91,7 +91,7 @@ async function getDouyinVideoUrl(url) {
             // If extraction fails, use defaults
         }
 
-        await page.waitForTimeout(15000); // Wait for video to load
+        await page.waitForTimeout(30000); // Wait for video to load (increased from 15s)
     } catch (e) {
         log(`  ⚠ 访问页面出错: ${e.message}`, 'yellow');
     }
@@ -108,13 +108,25 @@ async function downloadVideo(url, outputDir) {
     const filename = `douyin_${timestamp}.mp4`;
     const filepath = path.join(outputDir, filename);
 
-    const curlCmd = `curl -L -o "${filepath}" "${url}"`;
+    // Use curl with proper headers for Douyin
+    const curlCmd = `curl -L -o "${filepath}" "${url}" ` +
+        `-H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" ` +
+        `-H "Referer: https://www.douyin.com/" ` +
+        `-H "Accept: */*" ` +
+        `--max-time 60`;
 
     try {
         execSync(curlCmd, { stdio: 'pipe', encoding: 'utf-8' });
 
         const stats = fs.statSync(filepath);
         const sizeMB = (stats.size / 1024 / 1024).toFixed(2);
+
+        // Check if download was successful (file should be > 100KB)
+        if (stats.size < 100000) {
+            log(`  ⚠ 下载可能失败: 文件太小 (${sizeMB} MB)`, 'yellow');
+            // Try to continue anyway - might be a short video
+        }
+
         log(`  ✓ 下载完成: ${sizeMB} MB`, 'green');
 
         return { filepath, sizeMB };
@@ -213,7 +225,7 @@ def enhance_punctuation(text):
     # 段落分隔（根据话题标记）
     topic_markers = ['那么', '所以', '但是', '另外', '还有', '此外']
     for marker in topic_markers[:3]:  # 只对前三个进行换行处理
-        text = text.replace(marker，'\\n\\n' + marker)
+        text = text.replace(marker + ',','\\n\\n' + marker + ',')
 
     return text
 
