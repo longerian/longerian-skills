@@ -281,8 +281,89 @@ def extract_key_phrases(text):
     # 去重并返回
     return list(set(phrases))[:10]
 
+# ========== 生成结构化 Markdown 报告 ==========
+def generate_structured_report(result, video_title, video_author, duration, transcribe_time):
+    """生成类似 bilibili-research 的结构化报告"""
+    text = result['text']
+    segments = result['segments']
+
+    # 提取信息
+    keywords = extract_keywords(text)
+    key_phrases = extract_key_phrases(text)
+
+    # 生成一句话总结（基于前100字）
+    summary_text = text[:100]
+    summary = summary_text.split('。')[0] + '。' if '。' in summary_text else summary_text[:50] + '...'
+
+    # 生成内容大纲（均匀分段）
+    outline = []
+    total_segments = len(segments)
+    outline_count = min(7, total_segments)
+    step = max(1, total_segments // outline_count)
+
+    for i in range(0, total_segments, step):
+        if len(outline) >= outline_count:
+            break
+        seg_text = segments[i]['text']
+        if len(seg_text) >= 8:
+            outline.append(seg_text[:30])
+
+    # 生成核心观点（提取有意义的长句）
+    core_points = []
+    # 合并多个segments形成更长句子
+    for i in range(min(15, len(segments))):
+        combined_text = segments[i]['text'].strip()
+        if len(combined_text) > 15:  # 只保留长度足够的句子
+            # 清理文本
+            clean_text = combined_text.replace('？', '').replace('！', '').replace('，', '')
+            if len(clean_text) > 15:
+                core_points.append(combined_text)
+            if len(core_points) >= 5:
+                break
+
+    # 合并关键实体
+    key_entities = list(set(keywords[:5] + key_phrases[:5]))
+
+    # 生成详细内容章节（按时间分成3-5个章节）
+    detailed_sections = []
+    section_count = min(5, max(3, len(segments) // 20))
+    section_size = len(segments) // section_count
+
+    for i in range(section_count):
+        start_idx = i * section_size
+        end_idx = min((i + 1) * section_size, len(segments))
+        section_segments = segments[start_idx:end_idx]
+
+        if section_segments:
+            section_text = ''.join(s['text'] for s in section_segments)
+            section_text = enhance_punctuation(section_text)
+
+            # 提取章节标题
+            title_candidates = section_text[:50].split('，')
+            section_title = title_candidates[0][:15] if title_candidates else f'第{i+1}部分'
+            if len(section_title) < 3:
+                section_title = f'第{i+1}部分'
+
+            detailed_sections.append({
+                'heading': section_title,
+                'content': section_text,
+                'timestamp': int(section_segments[0]['start'])
+            })
+
+    return {
+        'summary': summary,
+        'outline': outline,
+        'core_points': core_points,
+        'key_entities': key_entities,
+        'detailed_sections': detailed_sections,
+        'keywords': keywords,
+        'key_phrases': key_phrases
+    }
+
 # ========== 生成 Markdown 报告 ==========
 md_path = os.path.join(output_dir, f'{output_name}-报告.md')
+report_data = generate_structured_report(result, video_title, video_author, duration, transcribe_time)
+
 with open(md_path, 'w', encoding='utf-8') as f:
     # Header
     f.write(f"# {video_title}\\n\\n")
@@ -294,28 +375,54 @@ with open(md_path, 'w', encoding='utf-8') as f:
 
     f.write("---\\n\\n")
 
-    # 关键词提取
-    f.write("## 📌 关键词\\n\\n")
-    keywords = extract_keywords(result['text'])
-    key_phrases = extract_key_phrases(result['text'])
+    # 总结
+    f.write("## 📌 总结\\n\\n")
+    f.write(f"{report_data['summary']}\\n\\n")
 
-    if keywords:
-        f.write("**高频词**: " + "、".join(keywords[:10]) + "\\n\\n")
-    if key_phrases:
-        f.write("**关键短语**: " + "、".join(key_phrases[:10]) + "\\n\\n")
+    # 内容大纲
+    f.write("## 📋 内容大纲\\n\\n")
+    for i, item in enumerate(report_data['outline'], 1):
+        f.write(f"{i}. {item}\\n")
+    f.write("\\n")
+
+    # 核心观点
+    f.write("## 💡 核心观点\\n\\n")
+    for i, point in enumerate(report_data['core_points'], 1):
+        f.write(f"{i}. {point}\\n")
+    f.write("\\n")
+
+    # 关键实体
+    f.write("## 🏷️ 关键实体\\n\\n")
+    f.write(" · ".join(report_data['key_entities']) + "\\n\\n")
 
     f.write("---\\n\\n")
 
-    # Full transcript with enhanced punctuation
-    f.write("## 完整转录\\n\\n")
-    text = enhance_punctuation(result['text'])
-    f.write(text + "\\n\\n")
+    # 详细内容
+    f.write("## 📖 详细内容\\n\\n")
+    for section in report_data['detailed_sections']:
+        timestamp_min = int(section['timestamp'] // 60)
+        timestamp_sec = int(section['timestamp'] % 60)
+        f.write(f"### [{timestamp_min}:{timestamp_sec:02d}] {section['heading']}\\n\\n")
+        f.write(f"{section['content']}\\n\\n")
 
-    # Segments with timestamps
-    f.write("---\\n\\n## 分段转录 (带时间戳)\\n\\n")
-    for i, seg in enumerate(result['segments'], 1):
-        timestamp = f"{int(seg['start']//60)}:{int(seg['start']%60):02d}"
-        f.write(f"### [{timestamp}] {seg['text']}\\n\\n")
+    f.write("---\\n\\n")
+
+    # 关键词
+    f.write("## 🔑 关键词分析\\n\\n")
+    f.write("**高频词**: " + "、".join(report_data['keywords'][:10]) + "\\n\\n")
+    f.write("**关键短语**: " + "、".join(report_data['key_phrases'][:10]) + "\\n\\n")
+
+    f.write("---\\n\\n")
+
+    # 原始分段转录（带时间戳）
+    f.write("## ⏱️ 分段转录 (带时间戳)\\n\\n")
+    for seg in result['segments'][:50]:  # 限制显示前50段
+        timestamp_min = int(seg['start'] // 60)
+        timestamp_sec = int(seg['start'] % 60)
+        f.write(f"**[{timestamp_min}:{timestamp_sec:02d}]** {seg['text']}\\n\\n")
+
+    if len(result['segments']) > 50:
+        f.write(f"_... 还有 {len(result['segments']) - 50} 个分段_\\n\\n")
 
 print(f"\\n转录完成:")
 print(f"  文本: {transcript_path}")
