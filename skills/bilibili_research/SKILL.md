@@ -16,7 +16,6 @@ version: 2.0.0
 ## Prerequisites
 
 - Python 3.10+ (Python 3.12 recommended for GPU acceleration)
-- Virtual environment with skill dependencies
 
 **Agent/提示模式**:
 - yt-dlp（视频提取）
@@ -43,18 +42,14 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 ## Directory Convention
 
 ```
-~/.cache/whisper/                 # Whisper 模型
+~/.cache/whisper/                 # Whisper 模型（共享）
 ~/.longerian/
-├── venv/bilibili-research/       # Skill 虚拟环境
-├── data/bilibili-research/       # 音频、转录文件输出
-└── scripts/                      # 共享脚本
+├── scripts/                      # 共享脚本
+└── data/bilibili-research/       # 音频、转录文件输出
 ```
 
 Setup:
 ```bash
-# 运行环境设置脚本（自动创建虚拟环境并安装依赖）
-./skills/bilibili_research/setup_env.sh
-
 # 创建输出目录
 mkdir -p ~/.longerian/data/bilibili-research
 ```
@@ -204,20 +199,17 @@ python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --basic
 
 ## Installation
 
-**自动安装（推荐）：**
-```bash
-./skills/bilibili_research/setup_env.sh
-```
-
-**手动安装：**
 ```bash
 # 安装外部工具
 brew install yt-dlp ffmpeg  # macOS
 # or
 apt install yt-dlp ffmpeg   # Linux
+# or
+choco install yt-dlp ffmpeg  # Windows
 
-# 创建虚拟环境并安装依赖
-python3 -m venv ~/.longerian/venv/bilibili-research
-source ~/.longerian/venv/bilibili-research/bin/activate
-pip install -r requirements.txt
+# 安装 Python 依赖
+pip install yt-dlp openai-whisper torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# 报告模式额外需要
+pip install openai matplotlib
 ```
