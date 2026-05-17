@@ -135,17 +135,21 @@ async function downloadVideo(url, outputDir) {
     }
 }
 
-async function transcribeVideo(videoPath, outputDir, videoInfo) {
+async function transcribeVideo(videoPath, outputDir, videoInfo, useAI = false) {
     log('\n[步骤 3/5] 正在使用 Whisper 转录 (GPU 加速)...', 'blue');
 
     const timestamp = Date.now();
     const outputName = `douyin_${timestamp}`;
 
     // Python transcription script with Markdown generation
+    const useAIFlag = useAI ? 'True' : 'False';
     const pythonScript = `
-import os, sys, time, whisper, re
+import os, sys, time, whisper, re, json
 from datetime import datetime
 from collections import Counter
+
+# AI analysis flag
+USE_AI = ${useAIFlag}
 
 # Fix encoding
 if sys.platform == 'win32':
@@ -281,13 +285,140 @@ def extract_key_phrases(text):
     # 去重并返回
     return list(set(phrases))[:10]
 
+# ========== LLM API 分析 ==========
+def analyze_with_llm(transcript, video_title, video_author):
+    """使用 LLM API 分析转录文本"""
+    try:
+        from openai import OpenAI
+    except ImportError:
+        print("  ⚠ 未安装 openai 库，跳过 AI 分析")
+        print("     安装: pip install openai")
+        return None
+
+    # 检查 API key
+    api_key = os.environ.get('ZHIPU_API_KEY') or os.environ.get('OPENAI_API_KEY')
+    if not api_key:
+        print("  ⚠ 未设置 API Key (ZHIPU_API_KEY 或 OPENAI_API_KEY)，跳过 AI 分析")
+        return None
+
+    base_url = os.environ.get('OPENAI_API_BASE') or os.environ.get('ZHIPU_API_BASE', 'https://open.bigmodel.cn/api/coding/paas/v4')
+    model = os.environ.get('LLM_MODEL', 'glm-4-flash')
+
+    try:
+        client = OpenAI(api_key=api_key, base_url=base_url)
+
+        prompt = f"""请分析以下抖音视频的转录文本。
+
+**第一步：识别内容类型**
+判断视频的内容类型：公司/商业分析、技术/教程、评论/观点、新闻/资讯、访谈/对话、或其他。
+
+**第二步：提取信息**
+1. 内容大纲（5-7条，按时间顺序，每条15-30字）
+2. 核心观点（3-5条，UP主主要想表达什么）
+3. 关键实体（人名、地名、机构名、技术名词）
+4. 一句话总结（20-50字）
+
+**第三步：生成详细内容**
+将提取的信息组织成结构化的详细章节。章节标题和数量根据内容类型自适应调整。
+
+**重要**：详细内容必须直接输出实质性的知识，用第三人称客观陈述。
+❌ 错误："视频介绍了XX公司"
+✅ 正确："XX公司预计于2024年5月中旬上市，估值约351亿美元"
+
+标题: {video_title}
+作者: {video_author}
+
+转录文本:
+{transcript[:8000]}
+
+请以JSON格式返回：
+{{
+  "content_type": "内容类型",
+  "outline": ["要点1", "要点2", ...],
+  "core_points": ["观点1", "观点2", ...],
+  "key_entities": ["实体1", "实体2", ...],
+  "summary": "一句话总结",
+  "detailed_sections": [
+    {{
+      "heading": "章节标题",
+      "content": "详细内容段落1。\\n\\n详细内容段落2。",
+      "timestamps": [0, 120]
+    }}
+  ]
+}}
+
+只返回JSON，不要其他文字。"""
+
+        print("  正在调用 LLM API 分析...")
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {'role': 'system', 'content': '你是一个专业的内容分析助手。生成详细内容时，直接输出具体的知识点、事实和数据，用第三人称客观陈述。不要说"视频介绍了""UP主提到"等元描述语言。'},
+                {'role': 'user', 'content': prompt}
+            ],
+            temperature=0.3,
+            timeout=120
+        )
+
+        content = response.choices[0].message.content
+
+        # 提取 JSON
+        start = content.find('{')
+        end = content.rfind('}') + 1
+        json_str = content[start:end] if start >= 0 else content
+
+        data = json.loads(json_str)
+        print("  ✓ AI 分析完成")
+        return data
+
+    except Exception as e:
+        print(f"  ⚠ AI 分析失败: {e}")
+        return None
+
 # ========== 生成结构化 Markdown 报告 ==========
-def generate_structured_report(result, video_title, video_author, duration, transcribe_time):
+def generate_structured_report(result, video_title, video_author, duration, transcribe_time, use_ai=False):
     """生成类似 bilibili-research 的结构化报告"""
     text = result['text']
     segments = result['segments']
 
-    # 提取信息
+    # 如果启用 AI，尝试使用 LLM 分析
+    ai_analysis = None
+    if use_ai:
+        ai_analysis = analyze_with_llm(text, video_title, video_author)
+
+    if ai_analysis:
+        # 使用 AI 分析结果
+        summary = ai_analysis.get('summary', '')
+        outline = ai_analysis.get('outline', [])
+        core_points = ai_analysis.get('core_points', [])
+        key_entities = ai_analysis.get('key_entities', [])
+        detailed_sections_raw = ai_analysis.get('detailed_sections', [])
+
+        # 处理详细内容章节（应用标点增强）
+        detailed_sections = []
+        for section in detailed_sections_raw:
+            content = enhance_punctuation(section.get('content', ''))
+            detailed_sections.append({
+                'heading': section.get('heading', ''),
+                'content': content,
+                'timestamp': section.get('timestamps', [0])[0] if section.get('timestamps') else 0
+            })
+
+        keywords = extract_keywords(text)
+        key_phrases = extract_key_phrases(text)
+
+        return {
+            'summary': summary,
+            'outline': outline,
+            'core_points': core_points,
+            'key_entities': key_entities,
+            'detailed_sections': detailed_sections,
+            'keywords': keywords,
+            'key_phrases': key_phrases,
+            'ai_generated': True
+        }
+
+    # 否则使用基于规则的提取
     keywords = extract_keywords(text)
     key_phrases = extract_key_phrases(text)
 
@@ -357,12 +488,13 @@ def generate_structured_report(result, video_title, video_author, duration, tran
         'key_entities': key_entities,
         'detailed_sections': detailed_sections,
         'keywords': keywords,
-        'key_phrases': key_phrases
+        'key_phrases': key_phrases,
+        'ai_generated': False
     }
 
 # ========== 生成 Markdown 报告 ==========
 md_path = os.path.join(output_dir, f'{output_name}-报告.md')
-report_data = generate_structured_report(result, video_title, video_author, duration, transcribe_time)
+report_data = generate_structured_report(result, video_title, video_author, duration, transcribe_time, USE_AI)
 
 with open(md_path, 'w', encoding='utf-8') as f:
     # Header
@@ -371,9 +503,10 @@ with open(md_path, 'w', encoding='utf-8') as f:
     f.write(f"**转录时间**: {datetime.now().strftime('%Y-%m-%d %H:%M')}\\n")
     f.write(f"**视频时长**: {duration:.1f}秒 ({duration/60:.1f}分钟)\\n")
     f.write(f"**转录耗时**: {transcribe_time:.1f}秒\\n")
-    f.write(f"**处理速度**: {duration/transcribe_time:.1f}x 实时\\n\\n")
-
-    f.write("---\\n\\n")
+    f.write(f"**处理速度**: {duration/transcribe_time:.1f}x 实时\\n")
+    if report_data.get('ai_generated'):
+        f.write(f"**分析方式**: AI 生成\\n")
+    f.write("\\n---\\n\\n")
 
     # 总结
     f.write("## 📌 总结\\n\\n")
@@ -471,7 +604,7 @@ async function copyToClipboard(text) {
     }
 }
 
-async function processVideo(url, index, total) {
+async function processVideo(url, index, total, useAI = false) {
     if (total > 1) {
         log(`\n${'='.repeat(50)}`, 'blue');
         log(`  处理视频 ${index}/${total}`, 'blue');
@@ -491,7 +624,7 @@ async function processVideo(url, index, total) {
     const { filepath, sizeMB } = await downloadVideo(mediaUrl, OUTPUT_DIR);
 
     // Step 3: Transcribe
-    const { mdPath } = await transcribeVideo(filepath, OUTPUT_DIR, videoInfo);
+    const { mdPath } = await transcribeVideo(filepath, OUTPUT_DIR, videoInfo, useAI);
 
     return { mdPath, videoInfo, filepath };
 }
@@ -500,7 +633,7 @@ async function main() {
     console.clear();
     log('='.repeat(50), 'blue');
     log('  抖音视频转录工具 (Whisper GPU 加速)', 'blue');
-    log('  支持: 单个链接 / 批量处理', 'blue');
+    log('  支持: 单个链接 / 批量处理 / AI 分析', 'blue');
     log('='.repeat(50), 'blue');
 
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -508,6 +641,14 @@ async function main() {
     // Parse command line arguments
     const args = process.argv.slice(2);
     let urls = [];
+    let useAI = false;
+
+    // Check for --ai flag
+    const aiIndex = args.indexOf('--ai');
+    if (aiIndex !== -1) {
+        useAI = true;
+        args.splice(aiIndex, 1); // Remove --ai from args
+    }
 
     if (args.length > 0) {
         // Command line mode
@@ -521,10 +662,31 @@ async function main() {
             log('⚠ 无效的参数格式', 'yellow');
             log('  单个链接: node douyin_transcribe.js "https://..."', 'gray');
             log('  批量处理: node douyin_transcribe.js --batch url1,url2,url3', 'gray');
+            log('  AI 分析: node douyin_transcribe.js --ai "url"', 'gray');
             process.exit(1);
         }
     } else {
-        // Interactive mode
+        // Interactive mode - ask if use AI
+        log('\n是否使用 AI 分析生成结构化报告?', 'blue');
+        log('  需要 API Key (ZHIPU_API_KEY 或 OPENAI_API_KEY)', 'gray');
+
+        const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout
+        });
+
+        const aiAnswer = await new Promise(resolve => {
+            rl.question('使用 AI 分析? (y/N): ', (answer) => {
+                rl.close();
+                resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
+            });
+        });
+
+        useAI = aiAnswer;
+        if (useAI) {
+            log('  ✓ 已启用 AI 分析', 'green');
+        }
+
         urls = await promptUrl();
     }
 
@@ -546,7 +708,7 @@ async function main() {
 
     try {
         for (let i = 0; i < total; i++) {
-            const result = await processVideo(urls[i], i + 1, total);
+            const result = await processVideo(urls[i], i + 1, total, useAI);
             if (result) {
                 results.push(result);
             }

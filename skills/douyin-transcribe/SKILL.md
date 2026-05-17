@@ -1,14 +1,14 @@
 ---
 name: douyin-transcribe
-description: Use when transcribing Douyin (抖音) videos to text. Triggers on douyin.com URLs or keywords: 抖音转录、抖音视频转文字、提取抖音字幕、transcribe douyin. Supports batch processing.
-version: 2.0.0
+description: Use when transcribing Douyin (抖音) videos to text. Triggers on douyin.com URLs or keywords: 抖音转录、抖音视频转文字、提取抖音字幕、transcribe douyin. Supports batch processing and AI-powered report generation.
+version: 2.1.0
 ---
 
 # Douyin Video Transcription
 
 ## Overview
 
-Transcribe Douyin (TikTok China) videos to text using Whisper with GPU acceleration. Automatically downloads videos, extracts audio, transcribes with Chinese-optimized models, and generates formatted Markdown reports with keywords.
+Transcribe Douyin (TikTok China) videos to text using Whisper with GPU acceleration. Automatically downloads videos, extracts audio, transcribes with Chinese-optimized models, and generates structured Markdown reports. Optional AI analysis for intelligent content summarization.
 
 ## When to Use
 
@@ -16,12 +16,14 @@ Transcribe Douyin (TikTok China) videos to text using Whisper with GPU accelerat
 digraph when_douyin {
     "Have Douyin URL?" [shape=diamond];
     "Need Chinese text?" [shape=diamond];
-    "Single or Batch?" [shape=diamond];
+    "Want AI analysis?" [shape=diamond];
     "Use this skill" [shape=box];
 
     "Have Douyin URL?" -> "Need Chinese text?";
     "Need Chinese text?" -> "Use this skill" [label="Yes"];
-    "Have Douyin URL?" -> "Use this skill" [label="Yes, batch URLs"];
+    "Have Douyin URL?" -> "Want AI analysis?";
+    "Want AI analysis?" -> "Use this skill with --ai" [label="Yes"];
+    "Want AI analysis?" -> "Use this skill" [label="No"];
 }
 ```
 
@@ -36,6 +38,7 @@ digraph when_douyin {
 | `node douyin_transcribe.js` | Interactive | User wants to paste URL(s) manually |
 | `node douyin_transcribe.js "URL"` | Single URL | URL provided directly |
 | `node douyin_transcribe.js --batch "url1,url2"` | Batch | Multiple URLs at once |
+| `node douyin_transcribe.js --ai "URL"` | AI Analysis | Generate intelligent report with LLM |
 
 **Supported URL formats:**
 - `https://www.douyin.com/video/{video_id}`
@@ -48,11 +51,14 @@ digraph when_douyin {
 
 | File | Content |
 |------|---------|
-| `douyin_{timestamp}-report.md` | Keywords, transcript with timestamps |
+| `douyin_{timestamp}-报告.md` | Structured report (AI or rule-based) |
 | `douyin_{timestamp}-transcript.txt` | Plain text |
+| `douyin_{timestamp}-segments.txt` | Timestamped segments |
 | `douyin_{timestamp}.mp4` | Downloaded video |
 
-**Report includes**: video metadata, keywords, full transcript with enhanced punctuation, segmented transcript with timestamps.
+**Report structure (AI mode)**: summary, outline, core points, key entities, detailed sections (AI-generated), keywords.
+
+**Report structure (rule mode)**: summary, outline, core points, key entities, detailed sections (time-based), keywords.
 
 ## Prerequisites
 
@@ -61,6 +67,10 @@ digraph when_douyin {
 - NVIDIA GPU with CUDA drivers
 - Node.js with `playwright`
 - `ffmpeg` for audio processing
+
+**For AI Analysis (optional):**
+- `openai` Python package: `pip install openai`
+- API Key: Set `ZHIPU_API_KEY` or `OPENAI_API_KEY` environment variable
 
 **Verify GPU:**
 ```bash
@@ -72,6 +82,8 @@ python -c "import torch; print(torch.cuda.get_device_name(0))"  # Your GPU name
 ```bash
 # Python 3.12 (CUDA)
 pip install openai-whisper torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# For AI analysis
+pip install openai
 # Node.js
 npm install playwright && npx playwright install
 # ffmpeg
@@ -83,6 +95,8 @@ choco install ffmpeg
 RTX 4070 SUPER: 2.5 min video → ~6 seconds (~25x real-time). CPU would take ~112 seconds.
 
 ## Features
+
+**v2.1**: AI-powered report generation with --ai flag (requires API key). Generates intelligent summaries, content outlines, and structured sections.
 
 **v2.0**: Enhanced punctuation, keyword extraction, batch processing. See IMPLEMENTATION.md for details.
 
