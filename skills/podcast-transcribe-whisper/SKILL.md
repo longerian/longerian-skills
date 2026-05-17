@@ -12,6 +12,20 @@ Transcribe podcast audio locally using OpenAI Whisper large-v3-turbo model. Comp
 
 - Python 3.x with `openai-whisper` installed
 - Sufficient disk space (~1.5GB for model)
+- **GPU acceleration (recommended)**: NVIDIA GPU with CUDA
+
+**Verify GPU:**
+```bash
+python -c "import torch; print(torch.cuda.is_available())"  # Should be True
+python -c "import torch; print(torch.cuda.get_device_name(0))"  # Your GPU name
+```
+
+**Install PyTorch with CUDA (Python 3.12 recommended):**
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+```
+
+Whisper auto-detects and uses GPU if available (~25x faster than CPU).
 
 ## Directory Convention
 
@@ -63,12 +77,18 @@ Models:
 Write script to `~/.longerian/scripts/transcribe.py`:
 
 ```python
-import os, whisper
+import os, whisper, torch
 
 AUDIO_PATH = os.path.expanduser('~/.longerian/data/podcast/episode.m4a')
 OUTPUT_DIR = os.path.expanduser('~/.longerian/data/podcast')
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# GPU detection
+if torch.cuda.is_available():
+    print(f"[GPU] Using CUDA: {torch.cuda.get_device_name(0)}")
+else:
+    print("[WARNING] CUDA not available, using CPU (slow)")
 
 # Use model size: tiny, base, small, medium, large-v3-turbo
 # Whisper auto-loads from ~/.cache/whisper/
@@ -110,11 +130,12 @@ Save to current working directory:
 
 - **No punctuation**: Whisper Chinese output lacks punctuation marks
 - **Name errors**: May misrecognize names (e.g., 任鑫→任心, 徐文浩→徐丰浩)
-- **CPU slow**: ~20 minutes for 1.5h audio on CPU; GPU significantly faster
+- **CPU slow**: ~20 minutes for 1.5h audio on CPU
 - **One continuous block**: No paragraph/speaker segmentation
 
 ## Tips
 
 - Models are auto-downloaded to `~/.cache/whisper/` on first use
 - For better quality with punctuation, consider using MiMo API skill instead
-- CPU transcription is slow (~20 min for 1.5h audio); GPU much faster
+- **GPU acceleration**: ~25x faster than CPU (1.5h audio → ~4 min on GPU)
+- Use Python 3.12 for best PyTorch CUDA support

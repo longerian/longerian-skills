@@ -15,7 +15,7 @@ version: 2.0.0
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.10+ (Python 3.12 recommended for GPU acceleration)
 - Virtual environment with skill dependencies
 
 **Agent/提示模式**:
@@ -27,6 +27,18 @@ version: 2.0.0
 - LLM API key (`OPENAI_API_KEY` 或 `ZHIPU_API_KEY`)
 - matplotlib（图表生成）
 - openai（API 调用）
+
+**GPU 加速（可选但推荐）**:
+- NVIDIA GPU with CUDA
+- PyTorch with CUDA support
+
+```bash
+# Verify GPU
+python -c "import torch; print(torch.cuda.is_available())"
+
+# Install PyTorch with CUDA (Python 3.12)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+```
 
 ## Directory Convention
 
@@ -69,16 +81,18 @@ Returns:
 
 ### Step 2: Transcribe if Needed
 
-If no subtitles found, transcribe audio using Whisper:
+If no subtitles found, transcribe audio using Whisper (GPU-accelerated):
 
 ```python
 from skills.bilibili_research.whisper_wrapper import transcribe
 
-transcription = transcribe(result.audio_path, language='zh')
+transcription = transcribe(result.audio_path, language='zh', verbose=True)
 transcript = transcription['text']
 ```
 
-**Note**: Uses Whisper models from `~/.cache/whisper/`. Models auto-download on first use.
+**Note**: Uses Whisper `large-v3-turbo` model from `~/.cache/whisper/` (shared with douyin-transcribe). Auto-detects and uses GPU if available.
+
+**Model options**: `tiny`, `base`, `small`, `medium`, `large-v3-turbo` (default, best accuracy)
 
 ### Step 3: Choose Analysis Mode
 
@@ -163,8 +177,12 @@ python3 bilibili_research.py "https://www.bilibili.com/video/BV..." --basic
 | Video requires login | Use `--cookies` with browser-exported cookies.txt |
 | No subtitles + audio extraction fails | Prompt user to provide cookies or skip video |
 | Whisper not installed | `pip install openai-whisper modelscope` |
-| Transcription slow (no GPU) | Warn user: ~1 min per 10 min of audio |
+| Transcription slow (no GPU) | Install PyTorch with CUDA for ~25x speedup |
 | Member video blocked | Prompt for cookies or skip |
+
+**GPU Performance**:
+- RTX 4070 SUPER: ~25x real-time speed
+- CPU fallback: ~1 min per 10 min of audio
 
 ## Output Example
 
